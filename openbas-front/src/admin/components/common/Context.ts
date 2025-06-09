@@ -25,7 +25,7 @@ import {
   type LessonsQuestionUpdateInput,
   type LessonsSendInput,
   type Objective,
-  type ObjectiveInput,
+  type ObjectiveInput, type PublicExercise, type PublicScenario,
   type Report,
   type ReportInput,
   type SearchPaginationInput,
@@ -53,6 +53,12 @@ export type ArticleContextType = {
 };
 
 export type ChallengeContextType = { previewChallengeUrl: () => string };
+
+export type PreviewChallengeContextType = {
+  linkToPlayerMode: string;
+  linkToAdministrationMode: string;
+  scenarioOrExercise: PublicScenario | PublicExercise | undefined;
+};
 
 export type DocumentContextType = {
   onInitDocument: () => {
@@ -99,9 +105,13 @@ export type TeamContextType = {
   checkUserEnabled?: (teamId: Team['team_id'], userId: UserStore['user_id']) => boolean;
   computeTeamUsersEnabled?: (teamId: Team['team_id']) => number;
   searchTeams: (input: SearchPaginationInput, contextualOnly?: boolean) => Promise<{ data: Page<TeamOutput> }>;
+  allUsersEnabledNumber?: number;
+  allUsersNumber?: number;
 };
 
 export type InjectContextType = {
+  injects: InjectOutputType[];
+  setInjects: (input: InjectOutputType[]) => void;
   searchInjects: (input: SearchPaginationInput) => Promise<{ data: Page<InjectOutputType> }>;
   onAddInject: (inject: Inject) => Promise<{
     result: string;
@@ -185,6 +195,15 @@ export const ChallengeContext = createContext<ChallengeContextType>({
     return '';
   },
 });
+export const PreviewChallengeContext = createContext<PreviewChallengeContextType>({
+  linkToPlayerMode: '',
+  linkToAdministrationMode: '',
+  scenarioOrExercise: {
+    description: '',
+    id: '',
+    name: '',
+  },
+});
 export const DocumentContext = createContext<DocumentContextType>({
   onInitDocument(): {
     document_tags: {
@@ -238,6 +257,8 @@ export const TeamContext = createContext<TeamContextType>({
   },
 });
 export const InjectContext = createContext<InjectContextType>({
+  injects: [],
+  setInjects: () => {},
   searchInjects(_: SearchPaginationInput): Promise<{ data: Page<InjectOutputType> }> {
     return new Promise<{ data: Page<InjectOutputType> }>(() => {
     });

@@ -1,22 +1,15 @@
-import { Divider, Grid, List, Paper, Tab, Tabs, Typography } from '@mui/material';
+import { Grid, Paper, Tab, Tabs, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { Fragment, type SyntheticEvent, useContext, useEffect, useMemo, useState } from 'react';
+import { type SyntheticEvent, useContext, useEffect, useMemo, useState } from 'react';
 import { makeStyles } from 'tss-react/mui';
 
 import { searchTargets } from '../../../../actions/injects/inject-action';
-import PaginationComponentV2 from '../../../../components/common/queryable/pagination/PaginationComponentV2';
-import { buildSearchPagination } from '../../../../components/common/queryable/QueryableUtils';
-import { useQueryable } from '../../../../components/common/queryable/useQueryableWithLocalStorage';
 import Empty from '../../../../components/Empty';
 import { useFormatter } from '../../../../components/i18n';
 import Loader from '../../../../components/Loader';
-import SearchFilter from '../../../../components/SearchFilter';
-import { type InjectTarget, type InjectTargetWithResult } from '../../../../utils/api-types';
-import useSearchAnFilter from '../../../../utils/SortingFiltering';
-import { isFeatureEnabled } from '../../../../utils/utils';
+import { type InjectTarget, type SearchPaginationInput } from '../../../../utils/api-types';
 import { InjectResultOverviewOutputContext, type InjectResultOverviewOutputContextType } from '../InjectResultOverviewOutputContext';
-import NewTargetListItem from './NewTargetListItem';
-import TargetListItem from './TargetListItem';
+import PaginatedTargetTab from './PaginatedTargetTab';
 import TargetResultsDetail from './TargetResultsDetail';
 
 const useStyles = makeStyles()({
@@ -45,95 +38,118 @@ const useStyles = makeStyles()({
   tabs: { marginLeft: 'auto' },
 });
 
+type TabConfig = {
+  key: number;
+  label: string;
+  type: string;
+  entityPrefix: string;
+};
+
 const AtomicTesting = () => {
   // Standard hooks
   const { classes } = useStyles();
   const theme = useTheme();
   const { t } = useFormatter();
-  const [selectedTargetLegacy, setSelectedTargetLegacy] = useState<InjectTargetWithResult>();
-  const [selectedTarget, setSelectedTarget] = useState<InjectTarget>();
-  const [targets, setTargets] = useState<InjectTarget[]>();
-  const [currentParentTarget, setCurrentParentTarget] = useState<InjectTargetWithResult>();
-  const [upperParentTarget, setUpperParentTarget] = useState<InjectTargetWithResult>();
-  const filtering = useSearchAnFilter('', 'name', ['name']);
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState<TabConfig>();
 
   // Fetching data
   const { injectResultOverviewOutput } = useContext<InjectResultOverviewOutputContextType>(InjectResultOverviewOutputContext);
-
-  const sortedTargets: InjectTargetWithResult[] = filtering.filterAndSort(injectResultOverviewOutput?.inject_targets ?? []);
-
   const [hasAssetsGroup, setHasAssetsGroup] = useState(false);
   const [hasAssetsGroupChecked, setHasAssetsGroupChecked] = useState(false);
+  const [hasEndpoints, setHasEndpoints] = useState(false);
+  const [hasEndpointsChecked, setHasEndpointsChecked] = useState(false);
+  const [hasAgents, setHasAgents] = useState(false);
+  const [hasAgentsChecked, setHasAgentsChecked] = useState(false);
+  const [reloadContentCount, setReloadContentCount] = useState(0);
   const [hasTeams, setHasTeams] = useState(false);
   const [hasTeamsChecked, setHasTeamsChecked] = useState(false);
+  const [hasPlayers, setHasPlayers] = useState(false);
+  const [hasPlayersChecked, setHasPlayersChecked] = useState(false);
+  const [selectedTarget, setSelectedTarget] = useState<InjectTarget>();
 
-  const paginationEnabled = isFeatureEnabled('TARGET_PAGINATION');
+  const navigateToTab = (tab: TabConfig | undefined) => {
+    setActiveTab(tab);
+    setReloadContentCount(reloadContentCount + 1);
+  };
 
-  const tabConfig = useMemo(() => {
-    let index = 0;
-    const tabs = [];
+  const tabConfig: TabConfig[] = useMemo(() => {
+    let index: number = 0;
+    const tabs: TabConfig[] = [];
 
-    // enable these tabs only when the TARGET_PAGINATION
-    // preview feature is set.
-    if (paginationEnabled) {
-      if (hasAssetsGroup) {
-        tabs.push({
-          key: index++,
-          label: t('Asset groups'),
-          type: 'ASSETS_GROUPS',
-          entityPrefix: 'asset_group_target',
-        });
-      }
-      if (hasTeams) {
-        tabs.push({
-          key: index++,
-          label: t('Teams'),
-          type: 'TEAMS',
-          entityPrefix: 'team_target',
-        });
-      }
+    if (hasAssetsGroup) {
+      tabs.push({
+        key: index++,
+        label: t('Asset groups'),
+        type: 'ASSETS_GROUPS',
+        entityPrefix: 'asset_group_target',
+      });
+    }
+    if (hasTeams) {
+      tabs.push({
+        key: index++,
+        label: t('Teams'),
+        type: 'TEAMS',
+        entityPrefix: 'team_target',
+      });
+    }
+    if (hasEndpoints) {
+      tabs.push({
+        key: index++,
+        label: t('Endpoints'),
+        type: 'ASSETS',
+        entityPrefix: 'endpoint_target',
+      });
+    }
+    if (hasPlayers) {
+      tabs.push({
+        key: index++,
+        label: t('Players'),
+        type: 'PLAYERS',
+        entityPrefix: 'player_target',
+      });
+    }
+    if (hasAgents) {
+      tabs.push({
+        key: index++,
+        label: t('Agents'),
+        type: 'AGENT',
+        entityPrefix: 'agent_target',
+      });
     }
 
-    tabs.push({
-      key: index++,
-      label: t('All targets'),
-      type: 'ALL_TARGETS',
-    });
+    // tabs visibility may have changed so we reevaluate this structure;
+    // figure out which tab to display; if the previously displayed tab
+    // is still available, keep it up
+    // otherwise default to the first occurring tab
+    if (tabs.length === 0) {
+      navigateToTab(undefined);
+    }
+
+    if (activeTab && tabs.map(conf => conf.type).includes(activeTab.type)) {
+      navigateToTab(tabs.find(tc => activeTab.type === tc.type));
+    } else {
+      navigateToTab(tabs[0]);
+    }
 
     return tabs;
-  }, [hasAssetsGroup, hasTeams]);
+  }, [hasAssetsGroup, hasTeams, hasEndpoints, hasAgents, hasPlayers]);
 
-  const { queryableHelpers, searchPaginationInput, setSearchPaginationInput } = useQueryable(buildSearchPagination({
-    filterGroup: {
-      mode: 'and',
-      filters: [],
-    },
-  }));
+  const activeTabKey: number = useMemo(() => {
+    return activeTab?.key || 0;
+  }, [activeTab]);
 
   const injectId = injectResultOverviewOutput?.inject_id || '';
 
   useEffect(() => {
     if (!injectResultOverviewOutput) return;
 
-    setSearchPaginationInput({
+    const searchPaginationInput1Result: SearchPaginationInput = {
       filterGroup: {
         mode: 'and',
         filters: [],
       },
-      page: 0,
-      size: 20,
-    });
-
-    setSelectedTargetLegacy(
-      selectedTargetLegacy
-      || currentParentTarget
-      || injectResultOverviewOutput?.inject_targets?.[0],
-    );
-
-    const searchPaginationInput1Result = {
-      ...searchPaginationInput,
       size: 1,
+      page: 0,
     };
 
     searchTargets(injectId, 'ASSETS_GROUPS', searchPaginationInput1Result)
@@ -145,6 +161,17 @@ const AtomicTesting = () => {
       .finally(() => {
         setHasAssetsGroupChecked(true);
       });
+
+    searchTargets(injectId, 'ASSETS', searchPaginationInput1Result)
+      .then((response) => {
+        if (response.data.content.length > 0) {
+          setHasEndpoints(true);
+        } else { setHasEndpoints(false); }
+      })
+      .finally(() => {
+        setHasEndpointsChecked(true);
+      });
+
     searchTargets(injectId, 'TEAMS', searchPaginationInput1Result)
       .then((response) => {
         if (response.data.content.length > 0) {
@@ -154,48 +181,57 @@ const AtomicTesting = () => {
       .finally(() => {
         setHasTeamsChecked(true);
       });
+
+    searchTargets(injectId, 'PLAYERS', searchPaginationInput1Result)
+      .then((response) => {
+        if (response.data.content.length > 0) {
+          setHasPlayers(true);
+        } else { setHasPlayers(false); }
+      })
+      .finally(() => {
+        setHasPlayersChecked(true);
+      });
+
+    searchTargets(injectId, 'AGENT', searchPaginationInput1Result)
+      .then((response) => {
+        if (response.data.content.length > 0) {
+          setHasAgents(true);
+        } else { setHasAgents(false); }
+      })
+      .finally(() => {
+        setHasAgentsChecked(true);
+      });
+
+    setReloadContentCount(reloadContentCount + 1);
   }, [injectResultOverviewOutput]);
 
   // Handles
-
-  const handleTargetClick = (target: InjectTargetWithResult, currentParent?: InjectTargetWithResult, upperParentTarget?: InjectTargetWithResult) => {
-    setSelectedTargetLegacy(target);
-    setCurrentParentTarget(currentParent);
-    setUpperParentTarget(upperParentTarget);
-  };
-
   const handleNewTargetClick = (target: InjectTarget) => {
-    // TODO: handle the platform type for Endpoint targets
-    setSelectedTargetLegacy({
-      id: target.target_id,
-      name: target.target_name,
-      targetType: target.target_type,
-      platformType: undefined,
-    });
     setSelectedTarget(target);
   };
 
   const handleTabChange = (_event: SyntheticEvent, newValue: number) => {
-    setActiveTab(newValue);
+    const location = tabConfig.find(tc => newValue == tc.key);
+    navigateToTab(location);
   };
 
-  const renderTargetItem = (target: InjectTargetWithResult, parent: InjectTargetWithResult | undefined, upperParent: InjectTargetWithResult | undefined) => {
+  const drawTabs = () => {
+    const tab = tabConfig.find(value => value.type == activeTab?.type);
+    if (!tab) {
+      return (<div />);
+    }
+    const isAllTargets = tab.type === 'ALL_TARGETS';
     return (
       <>
-        <TargetListItem
-          onClick={() => handleTargetClick(target, parent, upperParent)}
-          target={target}
-          selected={selectedTargetLegacy?.id === target.id && currentParentTarget?.id === parent?.id && upperParentTarget?.id === upperParent?.id}
-        />
-        {target?.children && target.children.length > 0 && (
-          <List disablePadding style={{ marginLeft: theme.spacing(2) }}>
-            {target.children.map(child => (
-              <Fragment key={child?.id}>
-                {renderTargetItem(child, target, parent)}
-              </Fragment>
-            ))}
-            <Divider className={classes.dividerL} />
-          </List>
+        {!isAllTargets && injectResultOverviewOutput && (
+          <PaginatedTargetTab
+            key={activeTabKey}
+            handleSelectTarget={handleNewTargetClick}
+            entityPrefix={tab.entityPrefix}
+            inject_id={injectResultOverviewOutput.inject_id}
+            target_type={tab.type}
+            reloadContentCount={reloadContentCount}
+          />
         )}
       </>
     );
@@ -213,10 +249,10 @@ const AtomicTesting = () => {
         </Typography>
         <div className="clearfix" />
         <Paper classes={{ root: classes.paper }} variant="outlined">
-          {hasAssetsGroupChecked && hasTeamsChecked && (
+          {hasAssetsGroupChecked && hasTeamsChecked && hasEndpointsChecked && hasAgentsChecked && hasPlayersChecked && (
             <>
               <Tabs
-                value={activeTab}
+                value={activeTabKey}
                 onChange={handleTabChange}
                 indicatorColor="primary"
                 textColor="primary"
@@ -227,68 +263,7 @@ const AtomicTesting = () => {
                     <Tab key={`tab-${tab.key}`} label={tab.label} />
                   ))}
               </Tabs>
-              {tabConfig
-                .map((tab) => {
-                  const isAllTargets = tab.type === 'ALL_TARGETS';
-                  return (
-                    <div key={`tab-${tab.key}`} hidden={activeTab !== tab.key}>
-                      {!isAllTargets && (
-                        <>
-                          <PaginationComponentV2
-                            fetch={input => searchTargets(injectResultOverviewOutput?.inject_id, tab.type, input)}
-                            searchPaginationInput={searchPaginationInput}
-                            setContent={setTargets}
-                            entityPrefix={tab.entityPrefix}
-                            queryableHelpers={queryableHelpers}
-                            topPagination={true}
-                          />
-                          {targets && targets.length > 0 ? (
-                            <List>
-                              {targets.map(target => (
-                                <NewTargetListItem
-                                  onClick={() => handleNewTargetClick(target)}
-                                  target={target}
-                                  selected={selectedTarget?.target_id === target.target_id}
-                                  key={target?.target_id}
-                                />
-                              ))}
-                            </List>
-                          ) : (
-                            <Empty message={t('No target configured.')} />
-                          )}
-                        </>
-                      )}
-
-                      {isAllTargets && (
-                        <>
-                          <div style={{
-                            display: 'flex',
-                            justifyContent: 'end',
-                          }}
-                          >
-                            <SearchFilter
-                              onChange={filtering.handleSearch}
-                              keyword={filtering.keyword}
-                              placeholder={t('Search by target name')}
-                              variant="thin"
-                            />
-                          </div>
-                          {sortedTargets.length > 0 ? (
-                            <List>
-                              {sortedTargets.map(target => (
-                                <div key={target?.id}>
-                                  {renderTargetItem(target, undefined, undefined)}
-                                </div>
-                              ))}
-                            </List>
-                          ) : (
-                            <Empty message={t('No target configured.')} />
-                          )}
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
+              {drawTabs()}
             </>
           )}
         </Paper>
@@ -298,17 +273,15 @@ const AtomicTesting = () => {
           {t('Results by target')}
         </Typography>
         <Paper classes={{ root: classes.paper }} variant="outlined">
-          {selectedTargetLegacy && !!injectResultOverviewOutput.inject_type && (
+          {selectedTarget && !!injectResultOverviewOutput.inject_type && (
             <TargetResultsDetail
               inject={injectResultOverviewOutput}
-              upperParentTargetId={upperParentTarget?.id}
-              parentTargetId={currentParentTarget?.id}
-              target={selectedTargetLegacy}
+              target={selectedTarget}
               lastExecutionStartDate={injectResultOverviewOutput.inject_status?.tracking_sent_date || ''}
               lastExecutionEndDate={injectResultOverviewOutput.inject_status?.tracking_end_date || ''}
             />
           )}
-          {!selectedTargetLegacy && (
+          {!selectedTarget && (
             <Empty message={t('No target data available.')} />
           )}
         </Paper>

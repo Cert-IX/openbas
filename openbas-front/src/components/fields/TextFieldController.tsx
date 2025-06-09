@@ -1,4 +1,8 @@
-import { InputAdornment, TextField, type TextFieldVariants } from '@mui/material';
+import {
+  InputAdornment,
+  TextField,
+  type TextFieldVariants,
+} from '@mui/material';
 import { type CSSProperties } from 'react';
 import { Controller, useFormContext } from 'react-hook-form';
 import { makeStyles } from 'tss-react/mui';
@@ -14,12 +18,28 @@ interface Props {
   variant?: TextFieldVariants;
   placeholder?: string;
   size?: 'medium' | 'small';
-  adornmentLabel?: string;
+  endAdornmentLabel?: string;
+  startAdornmentLabel?: string;
+  type?: 'number' | 'text';
 }
 
 const useStyles = makeStyles()(theme => ({ root: { '& .MuiOutlinedInput-root': { background: theme.palette.background.code } } }));
 
-const TextFieldController = ({ name, label, multiline, rows, disabled, required, style = {}, size, variant, placeholder = '', adornmentLabel }: Props) => {
+const TextFieldController = ({
+  name,
+  label = '',
+  multiline = false,
+  rows,
+  required = false,
+  disabled = false,
+  style = {},
+  variant = 'standard',
+  placeholder = '',
+  size = 'medium',
+  endAdornmentLabel,
+  startAdornmentLabel,
+  type = 'text',
+}: Props) => {
   const { control } = useFormContext();
   const { classes } = useStyles();
 
@@ -30,8 +50,9 @@ const TextFieldController = ({ name, label, multiline, rows, disabled, required,
       render={({ field, fieldState: { error } }) => (
         <TextField
           {...field}
+          type={type}
           className={classes.root}
-          label={label || ''}
+          label={label}
           fullWidth
           error={!!error}
           helperText={error ? error.message : null}
@@ -42,9 +63,30 @@ const TextFieldController = ({ name, label, multiline, rows, disabled, required,
           disabled={disabled}
           placeholder={placeholder}
           style={style}
-          variant={variant || 'standard'}
-          size={size || 'medium'}
-          slotProps={adornmentLabel ? { input: { endAdornment: <InputAdornment position="end">{adornmentLabel}</InputAdornment> } } : {}}
+          variant={variant}
+          size={size}
+          slotProps={{
+            input: {
+              ...(endAdornmentLabel
+                ? {
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        {endAdornmentLabel}
+                      </InputAdornment>
+                    ),
+                  }
+                : {}),
+              ...(startAdornmentLabel
+                ? {
+                    startAdornment: (
+                      <InputAdornment sx={{ alignSelf: 'flex-start' }} position="start">
+                        {startAdornmentLabel}
+                      </InputAdornment>
+                    ),
+                  }
+                : {}),
+            },
+          }}
         />
       )}
     />

@@ -99,7 +99,7 @@ const InjectTestList: FunctionComponent<Props> = ({
       label: 'Test status',
       isSortable: true,
       value: (test: InjectTestStatusOutput) => {
-        return (<ItemStatus isInject={true} status={test.status_name} label={t(test.status_name)} variant="inList" />);
+        return (<ItemStatus isInject={true} status={test.status_name} label={t(test.status_name || '-')} variant="inList" />);
       },
     },
   ];
@@ -151,50 +151,50 @@ const InjectTestList: FunctionComponent<Props> = ({
         {loading
           ? <PaginatedListLoader Icon={HelpOutlineOutlined} headers={headers} headerStyles={inlineStyles} />
           : tests?.map((test) => {
-            return (
-              <ListItem
-                key={test.status_id}
-                divider
-                secondaryAction={(
-                  <InjectTestPopover
-                    injectTest={test}
-                    onTest={result =>
-                      setTests(tests?.map(existing => existing.status_id !== result.status_id ? existing : result))}
-                    onDelete={injectStatusId => setTests(tests.filter(existing => (existing.status_id !== injectStatusId)))}
-                  />
-                )}
-                disablePadding
-              >
-                <ListItemButton
-                  classes={{ root: classes.item }}
-                  onClick={() => setSelectedInjectTestStatus(test)}
-                  selected={test.status_id === selectedInjectTestStatus?.status_id}
-                >
-                  <ListItemIcon>
-                    <InjectIcon
-                      type={test.inject_type}
-                      variant="list"
+              return (
+                <ListItem
+                  key={test.status_id}
+                  divider
+                  secondaryAction={(
+                    <InjectTestPopover
+                      injectTest={test}
+                      onTest={result =>
+                        setTests(tests?.map(existing => existing.status_id !== result.status_id ? existing : result))}
+                      onDelete={injectStatusId => setTests(tests.filter(existing => (existing.status_id !== injectStatusId)))}
                     />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={(
-                      <div className={classes.bodyItems}>
-                        {headers.map(header => (
-                          <div
-                            key={header.field}
-                            className={classes.bodyItem}
-                            style={inlineStyles[header.field]}
-                          >
-                            {header.value(test)}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  />
-                </ListItemButton>
-              </ListItem>
-            );
-          })}
+                  )}
+                  disablePadding
+                >
+                  <ListItemButton
+                    classes={{ root: classes.item }}
+                    onClick={() => setSelectedInjectTestStatus(test)}
+                    selected={test.status_id === selectedInjectTestStatus?.status_id}
+                  >
+                    <ListItemIcon>
+                      <InjectIcon
+                        type={test.inject_type}
+                        variant="list"
+                      />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={(
+                        <div className={classes.bodyItems}>
+                          {headers.map(header => (
+                            <div
+                              key={header.field}
+                              className={classes.bodyItem}
+                              style={inlineStyles[header.field]}
+                            >
+                              {header.value(test)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              );
+            })}
         {!tests ? (<Empty message={t('No data available')} />) : null}
       </List>
       {

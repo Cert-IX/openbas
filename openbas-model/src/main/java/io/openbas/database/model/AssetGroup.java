@@ -3,6 +3,7 @@ package io.openbas.database.model;
 import static java.time.Instant.now;
 import static lombok.AccessLevel.NONE;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
@@ -62,10 +63,11 @@ public class AssetGroup implements Base {
   @Type(JsonType.class)
   @Column(name = "asset_group_dynamic_filter")
   @JsonProperty("asset_group_dynamic_filter")
-  private FilterGroup dynamicFilter;
+  @NotNull
+  private FilterGroup dynamicFilter = FilterGroup.defaultFilterGroup();
 
   @ArraySchema(schema = @Schema(type = "string"))
-  @ManyToMany(fetch = FetchType.EAGER)
+  @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
       name = "asset_groups_assets",
       joinColumns = @JoinColumn(name = "asset_group_id"),
@@ -107,8 +109,8 @@ public class AssetGroup implements Base {
       name = "injects_asset_groups",
       joinColumns = @JoinColumn(name = "asset_group_id"),
       inverseJoinColumns = @JoinColumn(name = "inject_id"))
-  @JsonSerialize(using = MultiIdListDeserializer.class)
   @JsonProperty("asset_group_injects")
+  @JsonIgnore
   @Queryable(filterable = true, dynamicValues = true, path = "injects.id")
   private List<Inject> injects = new ArrayList<>();
 

@@ -1,6 +1,7 @@
 import { toPng } from 'html-to-image';
 import type { Content, ContentTable, TDocumentDefinitions } from 'pdfmake/interfaces';
 
+import { type Translate } from '../../../../../components/i18n';
 import LogoText from '../../../../../static/images/logo_text_light.png';
 import { type InjectResultOutput, type LessonsAnswer, type Report } from '../../../../../utils/api-types';
 import { resolveUserName } from '../../../../../utils/String';
@@ -61,9 +62,9 @@ interface Props {
   report: Report;
   reportData: ExerciseReportData;
   displayModule: (moduleType: ReportInformationType) => boolean;
-  tPick: (input: Record<string, string> | undefined) => string;
-  fldt: (input: string | undefined) => string;
-  t: (input: string | undefined) => string;
+  tPick: (input?: Record<string, string>) => string;
+  fldt: (input?: string) => string;
+  t: Translate;
 }
 
 const getExerciseReportPdfDocDefinition = async ({
@@ -96,10 +97,7 @@ const getExerciseReportPdfDocDefinition = async ({
   modulesImages.forEach((id) => {
     const element = document.getElementById(id);
     if (element) {
-      fetchPromises.push(toPng(element, {
-        backgroundColor: 'white',
-        fontEmbedCSS: 'Roboto',
-      }).then((img: string) => ({
+      fetchPromises.push(toPng(element).then((img: string) => ({
         key: id,
         img,
       })));
@@ -109,7 +107,7 @@ const getExerciseReportPdfDocDefinition = async ({
     const element = document.getElementById(`inject_expectations_${inject.inject_id}`);
     if (element) {
       fetchPromises.push(
-        toPng(element, { fontEmbedCSS: 'Roboto' }).then((img: string) => ({
+        toPng(element).then((img: string) => ({
           key: `inject_${inject.inject_id}`,
           img,
         })),

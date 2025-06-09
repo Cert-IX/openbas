@@ -5,12 +5,20 @@ import { type Edge, MarkerType, ReactFlow, ReactFlowProvider, useEdgesState, use
 import { type FunctionComponent, type SyntheticEvent, useContext, useEffect, useState } from 'react';
 import { makeStyles } from 'tss-react/mui';
 
-import { fetchInjectResultOverviewOutput, fetchTargetResult } from '../../../../actions/atomic_testings/atomic-testing-actions';
+import {
+  fetchInjectResultOverviewOutput,
+  fetchTargetResultMerged,
+} from '../../../../actions/atomic_testings/atomic-testing-actions';
 import { deleteInjectExpectationResult } from '../../../../actions/Exercise';
 import Transition from '../../../../components/common/Transition';
 import { useFormatter } from '../../../../components/i18n';
 import ItemResult from '../../../../components/ItemResult';
-import { type InjectExpectation, type InjectExpectationResult, type InjectResultOverviewOutput } from '../../../../utils/api-types';
+import {
+  type InjectExpectation,
+  type InjectExpectationResult,
+  type InjectResultOverviewOutput,
+  type InjectTarget,
+} from '../../../../utils/api-types';
 import useAutoLayout, { type LayoutOptions } from '../../../../utils/flows/useAutoLayout';
 import { useAppDispatch } from '../../../../utils/hooks';
 import { emptyFilled, truncate } from '../../../../utils/String';
@@ -103,14 +111,7 @@ interface Props {
   inject: InjectResultOverviewOutput;
   lastExecutionStartDate: string;
   lastExecutionEndDate: string;
-  target: {
-    id: string;
-    name?: string;
-    targetType: string;
-    platformType?: string;
-  };
-  parentTargetId?: string;
-  upperParentTargetId?: string;
+  target: InjectTarget;
 }
 
 const TargetResultsDetailFlow: FunctionComponent<Props> = ({
@@ -118,8 +119,6 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
   lastExecutionStartDate,
   lastExecutionEndDate,
   target,
-  parentTargetId,
-  upperParentTargetId,
 }) => {
   const { classes } = useStyles();
   const dispatch = useAppDispatch();
@@ -284,7 +283,7 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
           fontSize: 9,
         },
       })));
-      fetchTargetResult(inject.inject_id, target.id!, target.targetType!, target.targetType === 'AGENT' ? upperParentTargetId : parentTargetId).then(
+      fetchTargetResultMerged(inject.inject_id, target.target_id!, target.target_type!).then(
         (result: { data: InjectExpectationsStore[] }) => setTargetResults(result.data ?? []),
       );
       setActiveTab(0);
@@ -521,7 +520,7 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
     setSelectedExpectationForResults(null);
   };
 
-  const canShowExecutionTab = target.targetType !== 'ASSETS_GROUPS';
+  const canShowExecutionTab = target.target_type !== 'ASSETS_GROUPS';
 
   return (
     <>
@@ -530,19 +529,19 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
           <Typography variant="h3" gutterBottom>
             {t('Name')}
           </Typography>
-          {target.name}
+          {target.target_name}
         </div>
         <div>
           <Typography variant="h3" gutterBottom>
             {t('Type')}
           </Typography>
-          {target.targetType}
+          {target.target_type}
         </div>
         <div>
           <Typography variant="h3" gutterBottom>
             {t('Platform')}
           </Typography>
-          {target.platformType ?? t('N/A')}
+          {target.target_subtype ?? t('N/A')}
         </div>
       </div>
       <div
@@ -624,26 +623,26 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
                         <GridLegacy item={true} xs={5} sx={{ textAlign: 'end' }}>
                           {
                             injectExpectation.inject_expectation_status === 'SUCCESS' && injectExpectation.inject_expectation_type === 'PREVENTION' && (
-                              <ItemResult label="Prevented" status="Prevented" />
+                              <ItemResult label={t('Prevented')} status="Prevented" />
                             )
                           }
                           {
                             injectExpectation.inject_expectation_status === 'SUCCESS' && injectExpectation.inject_expectation_type === 'DETECTION' && (
-                              <ItemResult label="Detected" status="Detected" />
+                              <ItemResult label={t('Detected')} status="Detected" />
                             )
                           }
                           {
                             injectExpectation.inject_expectation_status === 'FAILED' && injectExpectation.inject_expectation_type === 'PREVENTION' && (
-                              <ItemResult label="Not Prevented" status="Not Prevented" />
+                              <ItemResult label={t('Not Prevented')} status="Not Prevented" />
                             )
                           }
                           {
                             injectExpectation.inject_expectation_status === 'FAILED' && injectExpectation.inject_expectation_type === 'DETECTION' && (
-                              <ItemResult label="Not Detected" status="Not Detected" />
+                              <ItemResult label={t('Not Detected')} status="Not Detected" />
                             )
                           }
                           {injectExpectation.inject_expectation_status && HUMAN_EXPECTATION.includes(injectExpectation.inject_expectation_type) && (
-                            <ItemResult label={injectExpectation.inject_expectation_status} status={injectExpectation.inject_expectation_status} />
+                            <ItemResult label={t(injectExpectation.inject_expectation_status)} status={injectExpectation.inject_expectation_status} />
                           )}
                           <Tooltip title={t('Score')}><Chip classes={{ root: classes.score }} label={injectExpectation.inject_expectation_score} /></Tooltip>
                         </GridLegacy>
@@ -790,7 +789,7 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
                                     </div>
                                   </TableCell>
                                   <TableCell>
-                                    <ItemResult label={expectationResult.result} status={expectationResult.result} />
+                                    <ItemResult label={t(expectationResult.result)} status={expectationResult.result} />
                                   </TableCell>
                                   <TableCell className={classes.tableFontSize}>
                                     {
@@ -955,7 +954,15 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
       ))}
       {(initialized && activeTab === Object.keys(sortedGroupedResults).length && canShowExecutionTab) && (
         <div style={{ paddingTop: theme.spacing(3) }}>
-          <ExecutionStatusDetail target={target} injectId={inject.inject_id} />
+          <ExecutionStatusDetail
+            target={{
+              id: target.target_id,
+              name: target.target_name,
+              targetType: target.target_type,
+              platformType: target.target_subtype,
+            }}
+            injectId={inject.inject_id}
+          />
         </div>
       )}
     </>

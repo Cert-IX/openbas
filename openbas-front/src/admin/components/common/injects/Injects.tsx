@@ -6,7 +6,6 @@ import { type CSSProperties, type FunctionComponent, type SyntheticEvent, useCon
 import { Link } from 'react-router';
 import { makeStyles } from 'tss-react/mui';
 
-import { type InjectorContractConverted } from '../../../../actions/injector_contracts/InjectorContract';
 import { type InjectOutputType, type InjectStore } from '../../../../actions/injects/Inject';
 import { exportInjectSearch } from '../../../../actions/injects/inject-action';
 import ChainedTimeline from '../../../../components/ChainedTimeline';
@@ -33,6 +32,7 @@ import {
   type Team,
   type Variable,
 } from '../../../../utils/api-types';
+import { type InjectorContractConverted } from '../../../../utils/api-types-custom';
 import { MESSAGING$ } from '../../../../utils/Environment';
 import useEntityToggle from '../../../../utils/hooks/useEntityToggle';
 import { splitDuration } from '../../../../utils/Time';
@@ -93,9 +93,6 @@ interface Props {
   articles: Article[];
   variables: Variable[];
   uriVariable: string;
-  allUsersNumber?: number;
-  usersNumber?: number;
-  teamsUsers: never;
 }
 
 const Injects: FunctionComponent<Props> = ({
@@ -106,15 +103,13 @@ const Injects: FunctionComponent<Props> = ({
   articles,
   variables,
   uriVariable,
-  allUsersNumber,
-  usersNumber,
-  teamsUsers,
 }) => {
   // Standard hooks
   const { classes } = useStyles();
   const { t, tPick } = useFormatter();
   const theme = useTheme();
   const injectContext = useContext(InjectContext);
+  const { injects, setInjects } = injectContext;
   const viewModeContext = useContext(ViewModeContext);
   const { permissions } = useContext(PermissionsContext);
 
@@ -223,6 +218,7 @@ const Injects: FunctionComponent<Props> = ({
     'inject_assets',
     'inject_asset_groups',
     'inject_teams',
+    'inject_tags',
   ];
 
   const quickFilter: FilterGroup = {
@@ -248,7 +244,6 @@ const Injects: FunctionComponent<Props> = ({
 
   // Injects
   // scoped to page
-  const [injects, setInjects] = useState<InjectOutputType[]>([]);
   // Bulk loading indicator for tests and delete
   const [isBulkLoading, setIsBulkLoading] = useState<boolean>(false);
   const [selectedInjectId, setSelectedInjectId] = useState<string | null>(null);
@@ -670,15 +665,10 @@ const Injects: FunctionComponent<Props> = ({
                 onUpdateInject={onUpdateInject}
                 massUpdateInject={massUpdateInject}
                 injectId={selectedInjectId}
-                // @ts-expect-error typing
+                injects={injects}
                 articlesFromExerciseOrScenario={articles}
                 variablesFromExerciseOrScenario={variables}
-                exerciseOrScenarioId={exerciseOrScenarioId}
                 uriVariable={uriVariable}
-                allUsersNumber={allUsersNumber}
-                usersNumber={usersNumber}
-                teamsUsers={teamsUsers}
-                injects={injects}
               />
             )}
           <ButtonCreate onClick={() => {
@@ -712,14 +702,9 @@ const Injects: FunctionComponent<Props> = ({
                 handleClose={() => setOpenCreateDrawer(false)}
                 onCreateInject={onCreateInject}
                 presetInjectDuration={presetInjectDuration}
-                // @ts-expect-error typing
-                teamsFromExerciseOrScenario={teams}
                 articlesFromExerciseOrScenario={articles}
-                variablesFromExerciseOrScenario={variables}
                 uriVariable={uriVariable}
-                allUsersNumber={allUsersNumber}
-                usersNumber={usersNumber}
-                teamsUsers={teamsUsers}
+                variablesFromExerciseOrScenario={variables}
               />
             )}
         </>

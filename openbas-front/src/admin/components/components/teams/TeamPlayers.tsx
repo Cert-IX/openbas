@@ -409,7 +409,7 @@ const TeamPlayers: FunctionComponent<Props> = ({ teamId, handleClose }) => {
         && (
           <TeamAddPlayers
             teamId={teamId}
-            addedUsersIds={users.map(u => u.user_id)}
+            addedUsersIds={users.filter(u => !!u).map(u => u.user_id)}
           />
         )
       }

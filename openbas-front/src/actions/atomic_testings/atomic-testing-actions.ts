@@ -45,11 +45,8 @@ export const relaunchAtomicTesting = (injectId: string) => {
   return simplePostCall(uri);
 };
 
-export const fetchTargetResult = (injectId: string, targetId: string, targetType: string, parentTargetId?: string) => {
-  let uri = `${ATOMIC_TESTING_URI}/${injectId}/target_results/${targetId}/types/${targetType}`;
-  if (parentTargetId) {
-    uri += `?parentTargetId=${encodeURIComponent(parentTargetId)}`;
-  }
+export const fetchTargetResultMerged = (injectId: string, targetId: string, targetType: string) => {
+  const uri = `${ATOMIC_TESTING_URI}/${injectId}/target_results/${targetId}/types/${targetType}/merged`;
   return simpleCall(uri);
 };
 

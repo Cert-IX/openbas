@@ -24,7 +24,8 @@ public class InjectComposer extends ComposerBase<Inject> {
     private final List<DocumentComposer.Composer> documentComposers = new ArrayList<>();
     private final List<TeamComposer.Composer> teamComposers = new ArrayList<>();
     private final List<AssetGroupComposer.Composer> assetGroupComposers = new ArrayList<>();
-    private final List<ExpectationComposer.Composer> expectationComposers = new ArrayList<>();
+    private final List<InjectExpectationComposer.Composer> expectationComposers = new ArrayList<>();
+    private final List<FindingComposer.Composer> findingComposers = new ArrayList<>();
 
     public Composer(Inject inject) {
       this.inject = inject;
@@ -92,12 +93,31 @@ public class InjectComposer extends ComposerBase<Inject> {
       return this;
     }
 
-    public Composer withExpectation(ExpectationComposer.Composer expectationComposer) {
+    public Composer withExpectation(InjectExpectationComposer.Composer expectationComposer) {
       expectationComposers.add(expectationComposer);
       List<InjectExpectation> tempExpectations = this.inject.getExpectations();
       tempExpectations.add(expectationComposer.get());
       expectationComposer.get().setInject(this.inject);
       this.inject.setExpectations(tempExpectations);
+      return this;
+    }
+
+    public Composer withDependsOn(Inject injectParent) {
+      InjectDependency injectDependency = new InjectDependency();
+      InjectDependencyId injectDependencyId = new InjectDependencyId();
+      injectDependencyId.setInjectParent(injectParent);
+      injectDependencyId.setInjectChildren(this.inject);
+      injectDependency.setCompositeId(injectDependencyId);
+      this.inject.setDependsOn(List.of(injectDependency));
+      return this;
+    }
+
+    public Composer withFinding(FindingComposer.Composer findingComposer) {
+      findingComposers.add(findingComposer);
+      List<Finding> tmpFindings = this.inject.getFindings();
+      tmpFindings.add(findingComposer.get());
+      findingComposer.get().setInject(this.inject);
+      this.inject.setFindings(tmpFindings);
       return this;
     }
 
@@ -115,6 +135,7 @@ public class InjectComposer extends ComposerBase<Inject> {
       documentComposers.forEach(DocumentComposer.Composer::persist);
       injectRepository.save(inject);
       injectStatusComposers.ifPresent(InjectStatusComposer.Composer::persist);
+      expectationComposers.forEach(InjectExpectationComposer.Composer::persist);
       injectDocumentRepository.saveAll(inject.getDocuments());
       return this;
     }
@@ -129,7 +150,7 @@ public class InjectComposer extends ComposerBase<Inject> {
       injectStatusComposers.ifPresent(InjectStatusComposer.Composer::delete);
       teamComposers.forEach(TeamComposer.Composer::delete);
       injectorContractComposer.ifPresent(InjectorContractComposer.Composer::delete);
-      documentComposers.forEach(DocumentComposer.Composer::delete);
+      expectationComposers.forEach(InjectExpectationComposer.Composer::delete);
       return this;
     }
 

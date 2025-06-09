@@ -2,8 +2,8 @@ package io.openbas.rest.asset.endpoint;
 
 import static io.openbas.database.model.User.ROLE_ADMIN;
 import static io.openbas.database.model.User.ROLE_USER;
-import static io.openbas.database.specification.EndpointSpecification.fromIds;
 import static io.openbas.helper.StreamHelper.fromIterable;
+import static io.openbas.helper.StreamHelper.iterableToSet;
 
 import io.openbas.aop.LogExecutionTime;
 import io.openbas.database.model.Agent;
@@ -11,12 +11,10 @@ import io.openbas.database.model.AssetAgentJob;
 import io.openbas.database.model.Endpoint;
 import io.openbas.database.repository.AssetAgentJobRepository;
 import io.openbas.database.repository.EndpointRepository;
+import io.openbas.database.repository.TagRepository;
 import io.openbas.database.specification.AssetAgentJobSpecification;
 import io.openbas.database.specification.EndpointSpecification;
-import io.openbas.rest.asset.endpoint.form.EndpointOutput;
-import io.openbas.rest.asset.endpoint.form.EndpointOverviewOutput;
-import io.openbas.rest.asset.endpoint.form.EndpointRegisterInput;
-import io.openbas.rest.asset.endpoint.form.EndpointUpdateInput;
+import io.openbas.rest.asset.endpoint.form.*;
 import io.openbas.rest.helper.RestBehavior;
 import io.openbas.service.EndpointService;
 import io.openbas.utils.EndpointMapper;
@@ -48,8 +46,21 @@ public class EndpointApi extends RestBehavior {
   private final EndpointService endpointService;
   private final EndpointRepository endpointRepository;
   private final AssetAgentJobRepository assetAgentJobRepository;
+  private final TagRepository tagRepository;
 
   private final EndpointMapper endpointMapper;
+
+  @PostMapping(ENDPOINT_URI + "/agentless")
+  @PreAuthorize("isPlanner()")
+  @Transactional(rollbackFor = Exception.class)
+  public Endpoint createEndpoint(@Valid @RequestBody final EndpointInput input) {
+    Endpoint endpoint = new Endpoint();
+    endpoint.setUpdateAttributes(input);
+    endpoint.setIps(EndpointMapper.setIps(input.getIps()));
+    endpoint.setMacAddresses(EndpointMapper.setMacAddresses(input.getMacAddresses()));
+    endpoint.setTags(iterableToSet(this.tagRepository.findAllById(input.getTagIds())));
+    return this.endpointService.createEndpoint(endpoint);
+  }
 
   @Secured(ROLE_ADMIN)
   @PostMapping(ENDPOINT_URI + "/register")
@@ -105,7 +116,8 @@ public class EndpointApi extends RestBehavior {
   @GetMapping(ENDPOINT_URI)
   @PreAuthorize("isObserver()")
   public List<Endpoint> endpoints() {
-    return this.endpointService.endpoints(EndpointSpecification.findEndpointsForInjection());
+    return this.endpointService.endpoints(
+        EndpointSpecification.findEndpointsForInjectionOrAgentlessEndpoints());
   }
 
   @LogExecutionTime
@@ -131,7 +143,7 @@ public class EndpointApi extends RestBehavior {
   @PostMapping(ENDPOINT_URI + "/find")
   @Transactional(readOnly = true)
   public List<Endpoint> findEndpoints(@RequestBody @Valid @NotNull final List<String> endpointIds) {
-    return this.endpointRepository.findAll(fromIds(endpointIds));
+    return this.endpointService.endpoints(endpointIds);
   }
 
   @Secured(ROLE_ADMIN)
@@ -139,7 +151,7 @@ public class EndpointApi extends RestBehavior {
   @Transactional(rollbackFor = Exception.class)
   public EndpointOverviewOutput updateEndpoint(
       @PathVariable @NotBlank final String endpointId,
-      @Valid @RequestBody final EndpointUpdateInput input) {
+      @Valid @RequestBody final EndpointInput input) {
     return endpointMapper.toEndpointOverviewOutput(
         this.endpointService.updateEndpoint(endpointId, input));
   }

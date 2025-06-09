@@ -26,6 +26,7 @@ import io.openbas.rest.exception.BadRequestException;
 import io.openbas.rest.exception.ElementNotFoundException;
 import io.openbas.rest.exception.LicenseRestrictionException;
 import io.openbas.rest.inject.form.*;
+import io.openbas.rest.inject.output.AgentsAndAssetsAgentless;
 import io.openbas.rest.injector_contract.InjectorContractService;
 import io.openbas.rest.security.SecurityExpression;
 import io.openbas.rest.security.SecurityExpressionHandler;
@@ -163,6 +164,14 @@ public class InjectService {
               tags.stream().map(Tag::getId).toList(),
               assetGroupService.assetGroups(input.getAssetGroups())));
     }
+
+    // if inject content is null we add the defaults from the injector contract
+    // this is the case when creating an inject from OpenCti
+    if (inject.getContent() == null || inject.getContent().isEmpty()) {
+      inject.setContent(
+          injectorContractService.getDynamicInjectorContractFieldsForInject(injectorContract));
+    }
+
     return injectRepository.save(inject);
   }
 
@@ -764,6 +773,39 @@ public class InjectService {
         });
   }
 
+  public AgentsAndAssetsAgentless getAgentsAndAgentlessAssetsByInject(Inject inject) {
+    Set<Agent> agents = new HashSet<>();
+    Set<Asset> assetsAgentless = new HashSet<>();
+
+    for (Asset asset : inject.getAssets()) {
+      extractAgentsAndAssetsAgentless(agents, assetsAgentless, asset);
+    }
+
+    for (AssetGroup assetGroup : inject.getAssetGroups()) {
+      for (Asset asset : assetGroupService.assetsFromAssetGroup(assetGroup.getId())) {
+        extractAgentsAndAssetsAgentless(agents, assetsAgentless, asset);
+      }
+    }
+
+    return new AgentsAndAssetsAgentless(agents, assetsAgentless);
+  }
+
+  private void extractAgentsAndAssetsAgentless(
+      Set<Agent> agents, Set<Asset> assetsAgentless, Asset asset) {
+    List<Agent> collectedAgents =
+        Optional.ofNullable(((Endpoint) Hibernate.unproxy(asset)).getAgents())
+            .orElse(Collections.emptyList());
+    if (collectedAgents.isEmpty()) {
+      assetsAgentless.add(asset);
+    } else {
+      for (Agent agent : collectedAgents) {
+        if (isPrimaryAgent(agent)) {
+          agents.add(agent);
+        }
+      }
+    }
+  }
+
   public List<Agent> getAgentsByInject(Inject inject) {
     List<Agent> agents = new ArrayList<>();
     Set<String> agentIds = new HashSet<>();
@@ -821,7 +863,7 @@ public class InjectService {
       case TEAMS:
         return injectStatusMapper.toExecutionTracesOutput(
             this.executionTraceRepository.findByInjectIdAndTeamId(injectId, targetId));
-      case PLAYER:
+      case PLAYERS:
         return injectStatusMapper.toExecutionTracesOutput(
             this.executionTraceRepository.findByInjectIdAndPlayerId(injectId, targetId));
       default:

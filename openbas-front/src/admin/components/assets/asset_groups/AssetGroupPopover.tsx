@@ -32,6 +32,8 @@ export interface AssetGroupPopoverProps {
   openEditOnInit?: boolean;
   onUpdate?: (result: AssetGroup) => void;
   onDelete?: (result: string) => void;
+  disabled?: boolean;
+  actions?: 'update' | 'delete' | 'manage-asset' | 'remove'[];
 }
 
 const AssetGroupPopover: FunctionComponent<AssetGroupPopoverProps> = ({
@@ -43,7 +45,8 @@ const AssetGroupPopover: FunctionComponent<AssetGroupPopoverProps> = ({
   openEditOnInit = false,
   onUpdate,
   onDelete,
-
+  disabled = false,
+  actions = ['update', 'delete', 'manage-asset', 'remove'],
 }) => {
   // Standard hooks
   const { classes } = useStyles();
@@ -128,6 +131,7 @@ const AssetGroupPopover: FunctionComponent<AssetGroupPopoverProps> = ({
         }}
         aria-haspopup="true"
         size="large"
+        disabled={disabled}
       >
         <MoreVert />
       </IconButton>
@@ -136,22 +140,28 @@ const AssetGroupPopover: FunctionComponent<AssetGroupPopoverProps> = ({
         open={Boolean(anchorEl)}
         onClose={() => setAnchorEl(null)}
       >
-        <MenuItem onClick={handleEdit}>
-          {t('Update')}
-        </MenuItem>
-        <MenuItem onClick={handleManage}>
-          {t('Manage assets')}
-        </MenuItem>
-        {onRemoveAssetGroupFromList && (
+        {actions.includes('update') && (
+          <MenuItem onClick={handleEdit}>
+            {t('Update')}
+          </MenuItem>
+        )}
+        {actions.includes('manage-asset') && (
+          <MenuItem onClick={handleManage}>
+            {t('Manage assets')}
+          </MenuItem>
+        )}
+        {actions.includes('remove') && onRemoveAssetGroupFromList && (
           <MenuItem onClick={() => onRemoveAssetGroupFromList(assetGroup.asset_group_id)}>
             {t(removeAssetGroupFromListMessage)}
           </MenuItem>
         )}
-        <MenuItem
-          onClick={handleDelete}
-        >
-          {t('Delete')}
-        </MenuItem>
+        {actions.includes('delete') && (
+          <MenuItem
+            onClick={handleDelete}
+          >
+            {t('Delete')}
+          </MenuItem>
+        )}
       </Menu>
 
       <DialogDelete

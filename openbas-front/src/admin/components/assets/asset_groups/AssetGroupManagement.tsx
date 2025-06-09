@@ -138,11 +138,12 @@ const AssetGroupManagement: FunctionComponent<Props> = ({
       <EndpointsList
         endpoints={endpoints}
         loading={loading}
-        actions={userAdmin
+        renderActions={(endpoint: EndpointOutput) => userAdmin
           ? (
-            // @ts-expect-error: Endpoint property handle by EndpointsList
               <EndpointPopover
                 inline
+                agentless={endpoint.asset_agents.length === 0}
+                endpoint={endpoint}
                 assetGroupId={assetGroup?.asset_group_id}
                 assetGroupEndpointIds={assetGroup?.asset_group_assets ?? []}
                 onRemoveEndpointFromAssetGroup={onRemoveEndpointFromList}

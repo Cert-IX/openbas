@@ -33,7 +33,6 @@ const useStyles = makeStyles()(() => ({
   importerStyle: {
     display: 'flex',
     alignItems: 'center',
-    marginTop: 20,
   },
   labelExecutionCondition: { color: '#7c8088' },
 }));
@@ -424,12 +423,12 @@ const InjectForm: FunctionComponent<Props> = ({ values, form, injects }) => {
           mode: element?.mode === '&&' ? 'and' : 'or',
           conditions: element?.conditionElement
             ? element?.conditionElement.map((value) => {
-              return {
-                key: value.key,
-                value: value.value,
-                operator: 'eq',
-              };
-            })
+                return {
+                  key: value.key,
+                  value: value.value,
+                  operator: 'eq',
+                };
+              })
             : [],
         },
       };
@@ -514,12 +513,12 @@ const InjectForm: FunctionComponent<Props> = ({ values, form, injects }) => {
         mode: element?.mode === '&&' ? 'and' : 'or',
         conditions: element?.conditionElement
           ? element?.conditionElement.map((value) => {
-            return {
-              key: value.key,
-              value: value.value,
-              operator: 'eq',
-            };
-          })
+              return {
+                key: value.key,
+                value: value.value,
+                operator: 'eq',
+              };
+            })
           : [],
       },
     };
@@ -600,12 +599,12 @@ const InjectForm: FunctionComponent<Props> = ({ values, form, injects }) => {
         mode: element?.mode === '&&' ? 'and' : 'or',
         conditions: element?.conditionElement
           ? element?.conditionElement.map((value) => {
-            return {
-              key: value.key,
-              value: value.value,
-              operator: 'eq',
-            };
-          })
+              return {
+                key: value.key,
+                value: value.value,
+                operator: 'eq',
+              };
+            })
           : [],
       },
     };
@@ -673,12 +672,12 @@ const InjectForm: FunctionComponent<Props> = ({ values, form, injects }) => {
         mode: element?.mode === '&&' ? 'and' : 'or',
         conditions: element?.conditionElement
           ? element?.conditionElement.map((value) => {
-            return {
-              key: value.key,
-              value: value.value,
-              operator: 'eq',
-            };
-          })
+              return {
+                key: value.key,
+                value: value.value,
+                operator: 'eq',
+              };
+            })
           : [],
       },
     };

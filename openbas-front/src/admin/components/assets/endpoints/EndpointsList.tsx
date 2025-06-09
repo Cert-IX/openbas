@@ -1,7 +1,7 @@
 import { DevicesOtherOutlined, HelpOutlineOutlined } from '@mui/icons-material';
 import { Chip, List, ListItem, ListItemIcon, ListItemText, Tooltip } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { cloneElement, type CSSProperties, type FunctionComponent, type ReactElement } from 'react';
+import { type CSSProperties, type FunctionComponent, type ReactElement } from 'react';
 import { makeStyles } from 'tss-react/mui';
 
 import ItemTags from '../../../../components/ItemTags';
@@ -41,13 +41,13 @@ const inlineStyles: Record<string, CSSProperties> = {
 
 interface Props {
   endpoints: EndpointOutput[];
-  actions: ReactElement<EndpointPopoverProps>;
+  renderActions: ((endpoint: EndpointOutput) => ReactElement<EndpointPopoverProps>);
   loading?: boolean;
 }
 
 const EndpointsList: FunctionComponent<Props> = ({
   endpoints,
-  actions,
+  renderActions,
   loading = false,
 }) => {
   // Standard hooks
@@ -55,7 +55,7 @@ const EndpointsList: FunctionComponent<Props> = ({
   const theme = useTheme();
 
   const component = (endpoint: EndpointOutput) => {
-    return cloneElement(actions, { endpoint });
+    return renderActions(endpoint);
   };
 
   const headers = [
@@ -100,41 +100,45 @@ const EndpointsList: FunctionComponent<Props> = ({
     },
   ];
 
+  if (loading) {
+    return (
+      <PaginatedListLoader Icon={HelpOutlineOutlined} headers={headers} headerStyles={inlineStyles} />
+    );
+  }
+  if (endpoints == undefined || endpoints?.length == 0) {
+    return null;
+  }
   return (
     <List>
-      {
-        loading
-          ? <PaginatedListLoader Icon={HelpOutlineOutlined} headers={headers} headerStyles={inlineStyles} />
-          : endpoints?.map((endpoint) => {
-            return (
-              <ListItem
-                key={endpoint.asset_id}
-                classes={{ root: classes.item }}
-                divider={true}
-                secondaryAction={component(endpoint)}
-              >
-                <ListItemIcon>
-                  <DevicesOtherOutlined color="primary" />
-                </ListItemIcon>
-                <ListItemText
-                  primary={(
-                    <>
-                      {headers.map(header => (
-                        <div
-                          key={header.field}
-                          className={classes.bodyItem}
-                          style={inlineStyles[header.field]}
-                        >
-                          {header.value(endpoint)}
-                        </div>
-                      ))}
-                    </>
-                  )}
-                />
-              </ListItem>
-            );
-          })
-      }
+      { endpoints?.map((endpoint) => {
+        return (
+          <ListItem
+            key={endpoint.asset_id}
+            classes={{ root: classes.item }}
+            divider={true}
+            secondaryAction={component(endpoint)}
+          >
+            <ListItemIcon>
+              <DevicesOtherOutlined color="primary" />
+            </ListItemIcon>
+            <ListItemText
+              primary={(
+                <>
+                  {headers.map(header => (
+                    <div
+                      key={header.field}
+                      className={classes.bodyItem}
+                      style={inlineStyles[header.field]}
+                    >
+                      {header.value(endpoint)}
+                    </div>
+                  ))}
+                </>
+              )}
+            />
+          </ListItem>
+        );
+      })}
     </List>
   );
 };

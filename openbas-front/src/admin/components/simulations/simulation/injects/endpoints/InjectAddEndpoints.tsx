@@ -1,43 +1,44 @@
 import { ControlPointOutlined } from '@mui/icons-material';
-import { ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
-import { type FunctionComponent, useContext, useState } from 'react';
+import { FormHelperText, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
+import { type FunctionComponent, useState } from 'react';
 import { makeStyles } from 'tss-react/mui';
 
 import { useFormatter } from '../../../../../../components/i18n';
 import EndpointsDialogAdding from '../../../../assets/endpoints/EndpointsDialogAdding';
-import { PermissionsContext } from '../../../../common/Context';
 
 const useStyles = makeStyles()(theme => ({
-  item: {
-    paddingLeft: 10,
-    height: 50,
-  },
   text: {
     fontSize: theme.typography.h2.fontSize,
     color: theme.palette.primary.main,
     fontWeight: theme.typography.h2.fontWeight,
   },
+  textError: {
+    fontSize: theme.typography.h2.fontSize,
+    color: theme.palette.error.main,
+    fontWeight: theme.typography.h2.fontWeight,
+  },
 }));
 
 interface Props {
-  disabled: boolean;
+  disabled?: boolean;
   endpointIds: string[];
   onSubmit: (endpointIds: string[]) => void;
   platforms?: string[];
   payloadArch?: string;
+  errorLabel?: string | null;
 }
 
 const InjectAddEndpoints: FunctionComponent<Props> = ({
-  disabled,
+  disabled = false,
   endpointIds,
   onSubmit,
   platforms,
   payloadArch,
+  errorLabel = null,
 }) => {
   // Standard hooks
   const { classes } = useStyles();
   const { t } = useFormatter();
-  const { permissions } = useContext(PermissionsContext);
 
   // Dialog
   const [openDialog, setOpenDialog] = useState(false);
@@ -47,20 +48,23 @@ const InjectAddEndpoints: FunctionComponent<Props> = ({
   return (
     <>
       <ListItemButton
-        classes={{ root: classes.item }}
         divider={true}
         onClick={handleOpen}
-        color="primary"
-        disabled={permissions.readOnly || disabled}
+        disabled={disabled}
       >
-        <ListItemIcon color="primary">
-          <ControlPointOutlined color="primary" />
+        <ListItemIcon>
+          <ControlPointOutlined color={errorLabel ? 'error' : 'primary'} />
         </ListItemIcon>
         <ListItemText
           primary={t('Modify target assets')}
-          classes={{ primary: classes.text }}
+          classes={{ primary: errorLabel ? classes.textError : classes.text }}
         />
       </ListItemButton>
+      {errorLabel && (
+        <FormHelperText error>
+          {errorLabel}
+        </FormHelperText>
+      )}
       <EndpointsDialogAdding
         initialState={endpointIds}
         open={openDialog}

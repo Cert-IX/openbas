@@ -14,7 +14,7 @@ import useDataLoader from '../../../../../utils/hooks/useDataLoader';
 import useSearchAnFilter from '../../../../../utils/SortingFiltering';
 import { TeamContext } from '../../../common/Context';
 import TagsFilter from '../../../common/filters/TagsFilter';
-import InjectIcon from '../../../common/injects/InjectIcon.tsx';
+import InjectIcon from '../../../common/injects/InjectIcon';
 import AnimationMenu from '../AnimationMenu';
 import CreateQuickInject from '../injects/CreateQuickInject';
 import teamContextForExercise from '../teams/teamContextForExercise';
@@ -201,7 +201,7 @@ const Mails = () => {
     .filterAndSort(injects)
     .filter(i => i.inject_communications_number > 0);
 
-  const teamContext = teamContextForExercise(exerciseId, []);
+  const teamContext = teamContextForExercise(exerciseId, exercise.exercise_teams_users, exercise.exercise_all_users_number, exercise.exercise_users_number);
 
   // Rendering
   return (
