@@ -38,11 +38,13 @@ declare module '@mui/material/styles' {
     ai: PaletteColor;
     xtmhub: PaletteColor;
     card: { paper: string };
+    labelChipMap: Map<string, LabelColor>;
   }
   interface PaletteOptions {
     chip: PaletteColorOptions;
     ee: PaletteColorOptions;
     ai: PaletteColorOptions;
+    labelChipMap: Map<string, LabelColor>;
     xtmhub: PaletteColorOptions;
   }
   interface Theme {
@@ -56,3 +58,14 @@ declare module '@mui/material/styles' {
     borderRadius: number;
   }
 }
+
+export interface LabelColor {
+  backgroundColor: string;
+  color: string;
+}
+
+export const LabelColorDict = {
+  Red: 'RED',
+  Green: 'GREEN',
+  Orange: 'ORANGE',
+} as const;

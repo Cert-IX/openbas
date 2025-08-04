@@ -5,6 +5,8 @@ import static io.openbas.database.model.User.ROLE_ADMIN;
 import static io.openbas.helper.StreamHelper.fromIterable;
 
 import io.openbas.aop.LogExecutionTime;
+import io.openbas.aop.lock.Lock;
+import io.openbas.aop.lock.LockResourceType;
 import io.openbas.authorisation.AuthorisationService;
 import io.openbas.database.model.*;
 import io.openbas.database.repository.*;
@@ -17,15 +19,14 @@ import io.openbas.rest.exception.UnprocessableContentException;
 import io.openbas.rest.exercise.exports.ExportOptions;
 import io.openbas.rest.helper.RestBehavior;
 import io.openbas.rest.inject.form.*;
-import io.openbas.rest.inject.service.ExecutableInjectService;
-import io.openbas.rest.inject.service.InjectExportService;
-import io.openbas.rest.inject.service.InjectService;
-import io.openbas.rest.inject.service.InjectStatusService;
+import io.openbas.rest.inject.service.*;
+import io.openbas.rest.payload.form.DetectionRemediationOutput;
 import io.openbas.rest.security.SecurityExpression;
 import io.openbas.service.ImportService;
 import io.openbas.service.targets.TargetService;
 import io.openbas.utils.FilterUtilsJpa;
 import io.openbas.utils.TargetType;
+import io.openbas.utils.mapper.PayloadMapper;
 import io.openbas.utils.pagination.SearchPaginationInput;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -35,10 +36,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -63,17 +61,18 @@ public class InjectApi extends RestBehavior {
 
   private static final int MAX_NEXT_INJECTS = 6;
 
+  private final AuthorisationService authorisationService;
+  private final ExecutableInjectService executableInjectService;
   private final ExerciseRepository exerciseRepository;
-  private final UserRepository userRepository;
+  private final ImportService importService;
   private final InjectRepository injectRepository;
   private final InjectService injectService;
-  private final InjectStatusService injectStatusService;
-  private final ExecutableInjectService executableInjectService;
-  private final ImportService importService;
+  private final InjectExecutionService injectExecutionService;
   private final InjectExportService injectExportService;
   private final ScenarioRepository scenarioRepository;
-  private final AuthorisationService authorisationService;
   private final TargetService targetService;
+  private final UserRepository userRepository;
+  private final PayloadMapper payloadMapper;
 
   // -- INJECTS --
 
@@ -325,12 +324,28 @@ public class InjectApi extends RestBehavior {
 
   @Secured(ROLE_ADMIN)
   @PostMapping(INJECT_URI + "/execution/{agentId}/callback/{injectId}")
+  @Lock(type = LockResourceType.INJECT, key = "#injectId")
+  @Operation(
+      summary = "Inject execution callback for implants",
+      description =
+          "This endpoint is invoked by implants to report the result of an inject execution. "
+              + "It is used to update the inject status and execution traces based on the implant's execution result."
+              + " If the requested action is 'complete', the inject must be in the 'PENDING' state. otherwise a 409"
+              + " is returned. This can sometimes happen if the payload executed by the implant was executed too quickly. ")
+  @ApiResponses(
+      value = {
+        @ApiResponse(responseCode = "200", description = "Execution callback was successful"),
+        @ApiResponse(
+            responseCode = "409",
+            description =
+                "The inject to update was not in a valid state in regards to the requested action. Retry in a few seconds."),
+      })
   public void injectExecutionCallback(
       @PathVariable
           String agentId, // must allow null because http injector used also this method to work.
       @PathVariable String injectId,
       @Valid @RequestBody InjectExecutionInput input) {
-    injectStatusService.handleInjectExecutionCallback(injectId, agentId, input);
+    injectExecutionService.handleInjectExecutionCallback(injectId, agentId, input);
   }
 
   @Secured(ROLE_ADMIN)
@@ -495,5 +510,13 @@ public class InjectApi extends RestBehavior {
   public InjectStatusOutput getInjectStatusWithGlobalExecutionTraces(
       @RequestParam String injectId) {
     return this.injectService.getInjectStatusWithGlobalExecutionTraces(injectId);
+  }
+
+  @Operation(description = "Get detection remediation by inject based on the payload definition")
+  @GetMapping(INJECT_URI + "/detection-remediations/{injectId}")
+  public List<DetectionRemediationOutput> getPayloadDetectionRemediations(
+      @PathVariable String injectId) {
+    return payloadMapper.toDetectionRemediationOutputs(
+        injectService.fetchDetectionRemediationsByInjectId(injectId));
   }
 }

@@ -1,7 +1,10 @@
 package io.openbas.utils.fixtures;
 
+import static io.openbas.database.model.InjectorContract.CONTRACT_ELEMENT_CONTENT_KEY_EXPECTATIONS;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.openbas.database.model.*;
 import io.openbas.injectors.challenge.model.ChallengeContent;
@@ -19,6 +22,17 @@ public class InjectFixture {
     inject.setInjectorContract(injectorContract);
     inject.setEnabled(true);
     inject.setDependsDuration(0L);
+
+    ObjectMapper objectMapper = new ObjectMapper();
+    ObjectNode injectContent = objectMapper.createObjectNode();
+    injectContent.set(
+        CONTRACT_ELEMENT_CONTENT_KEY_EXPECTATIONS,
+        objectMapper.convertValue(
+            List.of(
+                ExpectationFixture.createExpectation(InjectExpectation.EXPECTATION_TYPE.MANUAL)),
+            ArrayNode.class));
+    inject.setContent(injectContent);
+
     return inject;
   }
 
@@ -88,13 +102,27 @@ public class InjectFixture {
   }
 
   public static Inject createInjectCommandPayload(
-      InjectorContract injectorContract, Map<String, String> payloadArguments) {
+      InjectorContract injectorContract, Map<String, Object> payloadArguments) {
 
     Inject inject = createInject(injectorContract, "Inject title");
     ObjectMapper objectMapper = new ObjectMapper();
     ObjectNode injectContent = objectMapper.createObjectNode();
     payloadArguments.forEach(
         (key, value) -> injectContent.set(key, objectMapper.convertValue(value, JsonNode.class)));
+
+    payloadArguments.forEach(
+        (key, value) -> {
+          if (value instanceof String) {
+            injectContent.set(key, objectMapper.convertValue(value, JsonNode.class));
+          } else if (value instanceof List) {
+            ArrayNode arrayNode = objectMapper.createArrayNode();
+            (((List<?>) value).stream().toList()).forEach(item -> arrayNode.add(item.toString()));
+            injectContent.set(key, arrayNode);
+          } else {
+            throw new IllegalArgumentException("Unsupported type for key: " + key);
+          }
+        });
+
     inject.setContent(injectContent);
 
     return inject;

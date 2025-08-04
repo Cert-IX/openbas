@@ -5,6 +5,7 @@ import static io.openbas.config.AppConfig.MANDATORY_MESSAGE;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.openbas.database.model.*;
 import io.openbas.database.model.Endpoint.PLATFORM_TYPE;
+import io.openbas.database.model.InjectExpectation.EXPECTATION_TYPE;
 import io.openbas.database.model.Payload.PAYLOAD_SOURCE;
 import io.openbas.database.model.Payload.PAYLOAD_STATUS;
 import io.swagger.v3.oas.annotations.media.DiscriminatorMapping;
@@ -62,6 +63,11 @@ public class PayloadCreateInput {
   private Payload.PAYLOAD_EXECUTION_ARCH executionArch =
       Payload.PAYLOAD_EXECUTION_ARCH.ALL_ARCHITECTURES;
 
+  @JsonProperty("payload_expectations")
+  @NotNull
+  private EXPECTATION_TYPE[] expectations =
+      new EXPECTATION_TYPE[] {EXPECTATION_TYPE.PREVENTION, EXPECTATION_TYPE.DETECTION};
+
   @JsonProperty("payload_description")
   private String description;
 
@@ -101,6 +107,10 @@ public class PayloadCreateInput {
 
   @JsonProperty("payload_attack_patterns")
   private List<String> attackPatternsIds = new ArrayList<>();
+
+  @JsonProperty("payload_detection_remediations")
+  @Schema(description = "List of detection remediation gaps for collectors")
+  private List<DetectionRemediationInput> detectionRemediations = new ArrayList<>();
 
   @JsonProperty("payload_output_parsers")
   @Schema(description = "Set of output parsers")

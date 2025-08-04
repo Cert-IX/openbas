@@ -18,7 +18,8 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.openbas.config.EngineConfig;
-import io.openbas.engine.EsEngine;
+import io.openbas.database.repository.IndexingStatusRepository;
+import io.openbas.engine.EngineContext;
 import io.openbas.engine.EsModel;
 import io.openbas.engine.model.EsBase;
 import java.io.IOException;
@@ -26,10 +27,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.security.cert.X509Certificate;
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import javax.net.ssl.SSLContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,14 +42,9 @@ import org.apache.http.ssl.SSLContextBuilder;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.EnableRetry;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 
 @Component
-@EnableRetry
 @RequiredArgsConstructor
 @Slf4j
 public class ElasticDriver {
@@ -59,15 +52,16 @@ public class ElasticDriver {
   public static final String ES_ILM_POLICY = "-ilm-policy";
   public static final String ES_CORE_SETTINGS = "-core-settings";
 
-  private EsEngine esEngine;
+  private EngineContext searchEngine;
   private final EngineConfig config;
+  private final IndexingStatusRepository indexingStatusRepository;
 
   @Autowired
-  public void setEsEngine(EsEngine esEngine) {
-    this.esEngine = esEngine;
+  public void setSearchEngine(EngineContext searchEngine) {
+    this.searchEngine = searchEngine;
   }
 
-  public ElasticsearchClient getElasticClient() {
+  private ElasticsearchClient getElasticClient() {
     RestClientBuilder restClientBuilder = RestClient.builder(HttpHost.create(config.getUrl()));
     HttpAsyncClientBuilder clientBuilder = HttpAsyncClientBuilder.create();
     if (config.getUsername() != null) {
@@ -270,11 +264,6 @@ public class ElasticDriver {
     return mappings;
   }
 
-  @Retryable(
-      retryFor = {IllegalStateException.class},
-      maxAttempts = 5,
-      backoff = @Backoff(delay = 30000))
-  @Bean
   public <T extends EsBase> ElasticsearchClient elasticClient() throws Exception {
     log.info("Creating ElasticClient");
     ElasticsearchClient elasticClient = getElasticClient();
@@ -297,19 +286,51 @@ public class ElasticDriver {
     // If version of the model stored in elastic is different from the db version
     // Index + template must be removed and recreated
     // last_updated_at for the type must be reset to reindex the full data.
-    List<EsModel<T>> models = this.esEngine.getModels();
+    List<EsModel<T>> models = this.searchEngine.getModels();
     models.stream()
         .parallel()
         .forEach(
             esModel -> {
               Map<String, Property> mappings = mappingGeneratorForClass(esModel);
               try {
-                log.info("Creating Index {}", esModel.getName());
+                // Cleanup old index
+                if (indexingStatusRepository.findByType(esModel.getName()).isEmpty()) {
+                  log.info("Cleanup old Index {}", esModel.getName());
+                  cleanUpIndex(esModel.getName(), elasticClient);
+                }
+                log.info("Creating Index " + esModel.getName());
                 createIndex(elasticClient, esModel.getName(), ES_MODEL_VERSION, mappings);
               } catch (IOException e) {
                 throw new RuntimeException(e);
               }
             });
     return elasticClient;
+  }
+
+  public void cleanUpIndex(String indexName, ElasticsearchClient client) throws IOException {
+    try {
+      String fullIndexName = config.getIndexPrefix() + "_" + indexName;
+      String fullIndexWithSuffix = fullIndexName + config.getIndexSuffix();
+
+      // 1. Delete index and alias if they exist
+      for (String name : List.of(fullIndexName, fullIndexWithSuffix)) {
+        try {
+          client.indices().delete(d -> d.index(name));
+          log.info("Deleted index: {}", name);
+        } catch (ElasticsearchException e) {
+          log.warn("Index " + name + " does not exist or already deleted");
+        }
+      }
+
+      // 2. Delete index template
+      try {
+        client.indices().deleteIndexTemplate(d -> d.name(fullIndexName));
+        log.info("Deleted index template: " + fullIndexName);
+      } catch (ElasticsearchException e) {
+        log.warn("Index template {} does not exist or already deleted", fullIndexName);
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to delete index " + indexName, e);
+    }
   }
 }

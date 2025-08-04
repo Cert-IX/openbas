@@ -18,11 +18,13 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.concurrent.TimeoutException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class Executor {
 
   @Resource protected ObjectMapper mapper;

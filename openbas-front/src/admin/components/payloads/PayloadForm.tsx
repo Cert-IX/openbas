@@ -1,15 +1,18 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Button, Tab, Tabs } from '@mui/material';
+import { Box, Button, Tab, Tabs } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { type FormEvent, type SyntheticEvent, useState } from 'react';
+import { type FormEvent, type SyntheticEvent, useEffect, useState } from 'react';
 import { FormProvider, type SubmitHandler, useForm } from 'react-hook-form';
 import { z, type ZodTypeAny } from 'zod';
 
 import { useFormatter } from '../../../components/i18n';
 import { type PayloadCreateInput } from '../../../utils/api-types-custom';
+import useEnterpriseEdition from '../../../utils/hooks/useEnterpriseEdition';
+import EEChip from '../common/entreprise_edition/EEChip';
 import CommandsFormTab from './form/CommandsFormTab';
 import GeneralFormTab from './form/GeneralFormTab';
 import OutputFormTab from './form/OutputFormTab';
+import RemediationFormTab from './form/RemediationFormTab';
 
 interface Props {
   onSubmit: SubmitHandler<PayloadCreateInput>;
@@ -27,6 +30,7 @@ const PayloadForm = ({
     payload_type: null,
     payload_name: '',
     payload_platforms: [],
+    payload_expectations: ['PREVENTION', 'DETECTION'],
     payload_description: '',
     command_executor: '',
     command_content: '',
@@ -41,12 +45,50 @@ const PayloadForm = ({
     payload_prerequisites: [],
     payload_output_parsers: [],
     payload_execution_arch: 'ALL_ARCHITECTURES',
+    remediations: {},
   },
 }: Props) => {
   const { t } = useFormatter();
   const theme = useTheme();
-  const tabs = ['General', 'Commands', 'Output'];
-  const [activeTab, setActiveTab] = useState(tabs[0]);
+  const {
+    isValidated: isValidatedEnterpriseEdition,
+    openDialog: openEnterpriseEditionDialog,
+    setEEFeatureDetectedInfo,
+  } = useEnterpriseEdition();
+
+  const tabs = [{
+    key: 'General',
+    label: 'General',
+  }, {
+    key: 'Commands',
+    label: 'Commands',
+  }, {
+    key: 'Output',
+    label: 'Output',
+  }, {
+    key: 'Remediation',
+    label: (
+      <Box display="flex" alignItems="center">
+        {t('Remediation')}
+        {!isValidatedEnterpriseEdition && (
+          <EEChip
+            style={{ marginLeft: theme.spacing(1) }}
+            clickable
+            featureDetectedInfo={t('Remediation')}
+          />
+        )}
+      </Box>
+    ),
+  }];
+  const [activeTab, setActiveTab] = useState(tabs[0].key);
+
+  useEffect(() => {
+    if (activeTab === 'Remediation' && !isValidatedEnterpriseEdition) {
+      setActiveTab('General');
+      setEEFeatureDetectedInfo(t('Remediation'));
+      openEnterpriseEditionDialog();
+    }
+  }, [activeTab, isValidatedEnterpriseEdition]);
 
   const handleActiveTabChange = (_: SyntheticEvent, newValue: string) => {
     setActiveTab(newValue);
@@ -84,16 +126,24 @@ const PayloadForm = ({
 
   const payloadArgumentZodObject = z.object({
     default_value: z.string().nonempty(t('Should not be empty')),
-    key: z.string().min(1, { message: t('Should not be empty') }),
-    type: z.string().min(1, { message: t('Should not be empty') }),
+    key: z.string().nonempty(t('Should not be empty')),
+    type: z.string().nonempty(t('Should not be empty')),
     description: z.string().optional().nullable(),
-  });
+    separator: z.string().optional().nullable(),
+  }).refine(
+    data => data.type !== 'targeted-asset' || !!data.separator,
+    {
+      message: t('Should not be empty'),
+      path: ['separator'],
+    },
+  );
 
   const baseSchema = {
     payload_name: z.string().min(1, { message: t('Should not be empty') }).describe('General-tab'),
     payload_description: z.string().optional().describe('General-tab'),
     payload_attack_patterns: z.string().array().optional(),
     payload_tags: z.string().array().optional(),
+    payload_expectations: z.enum(['PREVENTION', 'DETECTION', 'VULNERABILITY', 'MANUAL', 'TEXT', 'CHALLENGE', 'DOCUMENT', 'ARTICLE']).array().optional(),
     payload_platforms: z.enum(['Linux', 'Windows', 'MacOS', 'Container', 'Service', 'Generic', 'Internal', 'Unknown']).array().min(1, { message: t('Should not be empty') }).describe('Commands-tab'),
     payload_execution_arch: z.enum(['x86_64', 'arm64', 'ALL_ARCHITECTURES'], { message: t('Should not be empty') }).describe('Commands-tab'),
     payload_cleanup_command: z.string().optional().describe('Commands-tab'),
@@ -101,6 +151,7 @@ const PayloadForm = ({
     payload_arguments: z.array(payloadArgumentZodObject).optional().describe('Commands-tab'),
     payload_prerequisites: z.array(payloadPrerequisiteZodObject).optional().describe('Commands-tab'),
     payload_output_parsers: z.array(outputParserObject).optional().describe('Output-tab'),
+    remediations: z.any().optional(),
   };
 
   const commandSchema = z.object({
@@ -181,7 +232,7 @@ const PayloadForm = ({
           onChange={handleActiveTabChange}
           aria-label="tabs for payload form"
         >
-          {tabs.map(tab => <Tab key={tab} label={tab} value={tab} />)}
+          {tabs.map(tab => <Tab key={tab.key} label={tab.label} value={tab.key} />)}
         </Tabs>
 
         {activeTab === 'General' && (
@@ -194,6 +245,10 @@ const PayloadForm = ({
 
         {activeTab === 'Output' && (
           <OutputFormTab />
+        )}
+
+        {activeTab === 'Remediation' && (
+          <RemediationFormTab />
         )}
 
         <div style={{

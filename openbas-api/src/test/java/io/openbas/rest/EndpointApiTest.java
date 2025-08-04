@@ -21,8 +21,8 @@ import io.openbas.rest.asset.endpoint.form.EndpointInput;
 import io.openbas.rest.asset.endpoint.form.EndpointRegisterInput;
 import io.openbas.rest.exercise.service.ExerciseService;
 import io.openbas.service.EndpointService;
-import io.openbas.utils.EndpointMapper;
 import io.openbas.utils.fixtures.ExerciseFixture;
+import io.openbas.utils.mapper.EndpointMapper;
 import io.openbas.utils.mockUser.WithMockAdminUser;
 import java.util.ArrayList;
 import java.util.List;
@@ -128,7 +128,7 @@ class EndpointApiTest extends IntegrationTest {
 
     Mockito.doReturn("command")
         .when(endpointService)
-        .generateUpgradeCommand(String.valueOf(Endpoint.PLATFORM_TYPE.Windows), null);
+        .generateUpgradeCommand(String.valueOf(Endpoint.PLATFORM_TYPE.Windows), null, null, null);
 
     // --EXECUTE--
     String response =
@@ -166,7 +166,7 @@ class EndpointApiTest extends IntegrationTest {
 
     Mockito.doReturn("command")
         .when(endpointService)
-        .generateUpgradeCommand(String.valueOf(Endpoint.PLATFORM_TYPE.Windows), null);
+        .generateUpgradeCommand(String.valueOf(Endpoint.PLATFORM_TYPE.Windows), null, null, null);
 
     // --EXECUTE--
     String response =

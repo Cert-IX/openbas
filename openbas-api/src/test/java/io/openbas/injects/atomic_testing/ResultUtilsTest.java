@@ -1,16 +1,22 @@
 package io.openbas.injects.atomic_testing;
 
-import static io.openbas.expectation.ExpectationType.*;
+import static io.openbas.expectation.ExpectationType.DETECTION;
+import static io.openbas.expectation.ExpectationType.HUMAN_RESPONSE;
+import static io.openbas.expectation.ExpectationType.PREVENTION;
+import static io.openbas.expectation.ExpectationType.VULNERABILITY;
 import static io.openbas.utils.fixtures.ExpectationResultByTypeFixture.createDefaultExpectationResultsByType;
 import static io.openbas.utils.fixtures.RawInjectExpectationFixture.createDefaultInjectExpectation;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
 import io.openbas.database.model.InjectExpectation;
-import io.openbas.database.repository.*;
-import io.openbas.service.AssetGroupService;
-import io.openbas.utils.AtomicTestingUtils.ExpectationResultsByType;
+import io.openbas.database.raw.RawInjectExpectation;
+import io.openbas.database.repository.InjectExpectationRepository;
+import io.openbas.database.repository.InjectRepository;
+import io.openbas.utils.InjectExpectationResultUtils.ExpectationResultsByType;
+import io.openbas.utils.InjectUtils;
 import io.openbas.utils.ResultUtils;
+import io.openbas.utils.mapper.InjectExpectationMapper;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,27 +28,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class ResultUtilsTest {
-  @Mock private InjectExpectationRepository injectExpectationRepository;
-  @Mock private TeamRepository teamRepository;
-  @Mock private UserRepository userRepository;
-  @Mock private AssetRepository assetRepository;
-  @Mock private AgentRepository agentRepository;
-  @Mock private AssetGroupRepository assetGroupRepository;
-  @Mock private AssetGroupService assetGroupService;
 
+  @Mock private InjectExpectationRepository injectExpectationRepository;
+  @Mock private InjectRepository injectRepository;
+  @Mock private InjectUtils injectUtils;
+
+  private InjectExpectationMapper injectExpectationMapper;
   private ResultUtils resultUtils;
 
   @BeforeEach
   void before() {
-    resultUtils =
-        new ResultUtils(
-            injectExpectationRepository,
-            teamRepository,
-            userRepository,
-            assetRepository,
-            assetGroupRepository,
-            assetGroupService,
-            agentRepository);
+    injectExpectationMapper = new InjectExpectationMapper(injectRepository, injectUtils);
+    resultUtils = new ResultUtils(injectExpectationRepository, injectExpectationMapper);
   }
 
   @Test
@@ -53,27 +50,34 @@ class ResultUtilsTest {
 
     Set<String> injectIds = Set.of(injectId1, injectId2);
 
+    List<RawInjectExpectation> expectations =
+        List.of(
+            createDefaultInjectExpectation(
+                InjectExpectation.EXPECTATION_TYPE.PREVENTION.toString(), 100.0, 100.0),
+            createDefaultInjectExpectation(
+                InjectExpectation.EXPECTATION_TYPE.DETECTION.toString(), 100.0, 100.0),
+            createDefaultInjectExpectation(
+                InjectExpectation.EXPECTATION_TYPE.VULNERABILITY.toString(), 100.0, 100.0),
+            createDefaultInjectExpectation(
+                InjectExpectation.EXPECTATION_TYPE.MANUAL.toString(), 0.0, 100.0),
+            createDefaultInjectExpectation(
+                InjectExpectation.EXPECTATION_TYPE.PREVENTION.toString(), 50.0, 100.0),
+            createDefaultInjectExpectation(
+                InjectExpectation.EXPECTATION_TYPE.DETECTION.toString(), 100.0, 100.0),
+            createDefaultInjectExpectation(
+                InjectExpectation.EXPECTATION_TYPE.VULNERABILITY.toString(), 100.0, 100.0),
+            createDefaultInjectExpectation(
+                InjectExpectation.EXPECTATION_TYPE.MANUAL.toString(), 0.0, 100.0),
+            createDefaultInjectExpectation(
+                InjectExpectation.EXPECTATION_TYPE.PREVENTION.toString(), 0.0, 100.0),
+            createDefaultInjectExpectation(
+                InjectExpectation.EXPECTATION_TYPE.DETECTION.toString(), 100.0, 100.0),
+            createDefaultInjectExpectation(
+                InjectExpectation.EXPECTATION_TYPE.VULNERABILITY.toString(), 100.0, 100.0),
+            createDefaultInjectExpectation(
+                InjectExpectation.EXPECTATION_TYPE.MANUAL.toString(), 0.0, 100.0));
     when(injectExpectationRepository.rawForComputeGlobalByInjectIds(injectIds))
-        .thenReturn(
-            List.of(
-                createDefaultInjectExpectation(
-                    InjectExpectation.EXPECTATION_TYPE.PREVENTION.toString(), 100.0, 100.0),
-                createDefaultInjectExpectation(
-                    InjectExpectation.EXPECTATION_TYPE.DETECTION.toString(), 100.0, 100.0),
-                createDefaultInjectExpectation(
-                    InjectExpectation.EXPECTATION_TYPE.MANUAL.toString(), 0.0, 100.0),
-                createDefaultInjectExpectation(
-                    InjectExpectation.EXPECTATION_TYPE.PREVENTION.toString(), 50.0, 100.0),
-                createDefaultInjectExpectation(
-                    InjectExpectation.EXPECTATION_TYPE.DETECTION.toString(), 100.0, 100.0),
-                createDefaultInjectExpectation(
-                    InjectExpectation.EXPECTATION_TYPE.MANUAL.toString(), 0.0, 100.0),
-                createDefaultInjectExpectation(
-                    InjectExpectation.EXPECTATION_TYPE.PREVENTION.toString(), 0.0, 100.0),
-                createDefaultInjectExpectation(
-                    InjectExpectation.EXPECTATION_TYPE.DETECTION.toString(), 100.0, 100.0),
-                createDefaultInjectExpectation(
-                    InjectExpectation.EXPECTATION_TYPE.MANUAL.toString(), 0.0, 100.0)));
+        .thenReturn(expectations);
 
     var result = resultUtils.computeGlobalExpectationResults(injectIds);
 
@@ -83,12 +87,20 @@ class ResultUtilsTest {
     ExpectationResultsByType expectedDetectionResult =
         createDefaultExpectationResultsByType(
             DETECTION, InjectExpectation.EXPECTATION_STATUS.SUCCESS, 3, 0, 0, 0);
+    ExpectationResultsByType expectedVulnerabilityResult =
+        createDefaultExpectationResultsByType(
+            VULNERABILITY, InjectExpectation.EXPECTATION_STATUS.SUCCESS, 3, 0, 0, 0);
     ExpectationResultsByType expectedHumanResponseResult =
         createDefaultExpectationResultsByType(
             HUMAN_RESPONSE, InjectExpectation.EXPECTATION_STATUS.FAILED, 0, 0, 0, 3);
 
-    assertEquals(
-        List.of(expectedPreventionResult, expectedDetectionResult, expectedHumanResponseResult),
-        result);
+    List<ExpectationResultsByType> expectedPreventionResult1 =
+        List.of(
+            expectedPreventionResult,
+            expectedDetectionResult,
+            expectedVulnerabilityResult,
+            expectedHumanResponseResult);
+
+    assertEquals(expectedPreventionResult1, result);
   }
 }

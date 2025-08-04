@@ -1,24 +1,11 @@
 import { type Dispatch } from 'redux';
 
 import { getReferential, simpleCall, simplePostCall } from '../../utils/Action';
-import { type Exercise, type InjectBulkProcessingInput, type InjectExportFromSearchRequestInput, type InjectExportRequestInput, type InjectImportInput, type Scenario, type SearchPaginationInput } from '../../utils/api-types';
+import { type Exercise, type InjectExportFromSearchRequestInput, type InjectExportRequestInput, type InjectImportInput, type Scenario, type SearchPaginationInput } from '../../utils/api-types';
 import { MESSAGING$ } from '../../utils/Environment';
 import * as schema from '../Schema';
 
 const INJECT_URI = '/api/injects';
-
-export const testInject = (injectId: string) => {
-  const uri = `/api/injects/${injectId}/test`;
-  return simpleCall(uri);
-};
-
-export const bulkTestInjects = (data: InjectBulkProcessingInput) => {
-  const uri = '/api/injects/test';
-  return simplePostCall(uri, data, undefined, false).catch((error) => {
-    MESSAGING$.notifyError('Can\'t be tested');
-    throw error;
-  });
-};
 
 export const exportInjectSearch = (data: InjectExportFromSearchRequestInput) => {
   const uri = '/api/injects/search/export';
@@ -118,4 +105,10 @@ export const getInjectTracesFromInjectAndTarget = (injectId: string = '', target
 export const getInjectStatusWithGlobalExecutionTraces = (injectId: string = '') => {
   const params = { injectId };
   return simpleCall(`${INJECT_URI}/status`, { params });
+};
+
+// Detection Remediation
+export const fetchPayloadDetectionRemediationsByInject = (injectId: string) => {
+  const uri = `${INJECT_URI}/detection-remediations/${injectId}`;
+  return simpleCall(uri);
 };

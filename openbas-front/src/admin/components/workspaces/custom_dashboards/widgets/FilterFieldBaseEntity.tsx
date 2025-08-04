@@ -1,4 +1,4 @@
-import { Card, CardActionArea, CardContent, Checkbox, Typography } from '@mui/material';
+import { Card, CardActionArea, CardContent, Checkbox, FormHelperText, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { type FunctionComponent, useEffect, useState } from 'react';
 
@@ -11,13 +11,15 @@ import { type Option } from '../../../../../utils/Option';
 interface Props {
   value: string | null;
   onChange: (value: string | null) => void;
+  error?: boolean;
 }
 
-const ENTITIES = ['expectation-inject', 'finding'];
+const ENTITIES = ['expectation-inject', 'finding', 'endpoint', 'vulnerable-endpoint'];
 
 const FilterFieldBaseEntity: FunctionComponent<Props> = ({
   value,
   onChange,
+  error = false,
 }) => {
   // Standard hooks
   const { t } = useFormatter();
@@ -72,13 +74,14 @@ const FilterFieldBaseEntity: FunctionComponent<Props> = ({
             }}
             >
               <Checkbox checked={value === option.id} />
-              <Typography style={{ textAlign: 'center' }}>
+              <Typography color={error ? 'error' : 'default'} style={{ textAlign: 'center' }}>
                 {t(option.label)}
               </Typography>
             </CardContent>
           </CardActionArea>
         </Card>
       ))}
+      {error && <FormHelperText error>{t('Should at least select one dimension')}</FormHelperText>}
     </div>
   );
 };

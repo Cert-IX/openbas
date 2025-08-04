@@ -46,9 +46,12 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Slf4j
 public class InjectsExecutionJob implements Job {
+
+  public static final String DEFAULT_EXECUTION_THRESHOLD_TIME_IN_MINUTS = "10";
+  private static final long delayForSimulationCompletedEvent = 3600L;
+
   private final Environment env;
   private int injectExecutionThreshold;
-  private static final long delayForSimulationCompletedEvent = 3600L;
 
   private final InjectHelper injectHelper;
   private final ExerciseRepository exerciseRepository;
@@ -75,7 +78,7 @@ public class InjectsExecutionJob implements Job {
   private void init() {
     String threshold = env.getProperty("inject.execution.threshold.minutes");
     if (threshold == null || threshold.isBlank()) {
-      threshold = "10";
+      threshold = DEFAULT_EXECUTION_THRESHOLD_TIME_IN_MINUTS;
     }
     this.injectExecutionThreshold = Integer.parseInt(threshold);
   }

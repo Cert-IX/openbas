@@ -1,4 +1,4 @@
-import { AddModeratorOutlined, MoreVertOutlined, PersonAddOutlined } from '@mui/icons-material';
+import { AddModeratorOutlined, InventoryOutlined, MoreVertOutlined } from '@mui/icons-material';
 import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogContentText, GridLegacy, IconButton, Menu, MenuItem, Paper, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Tooltip, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { type Edge, MarkerType, ReactFlow, ReactFlowProvider, useEdgesState, useNodesState, useReactFlow } from '@xyflow/react';
@@ -23,8 +23,12 @@ import useAutoLayout, { type LayoutOptions } from '../../../../utils/flows/useAu
 import { useAppDispatch } from '../../../../utils/hooks';
 import { emptyFilled, truncate } from '../../../../utils/String';
 import { isNotEmptyField } from '../../../../utils/utils';
-import { type InjectExpectationsStore } from '../../common/injects/expectations/Expectation';
-import { HUMAN_EXPECTATION, isTechnicalExpectation } from '../../common/injects/expectations/ExpectationUtils';
+import { type ExpectationResultType, ExpectationType, type InjectExpectationsStore } from '../../common/injects/expectations/Expectation';
+import {
+  HUMAN_EXPECTATION,
+  isManualExpectation,
+  isTechnicalExpectation,
+} from '../../common/injects/expectations/ExpectationUtils';
 import InjectIcon from '../../common/injects/InjectIcon';
 import ExecutionStatusDetail from '../../common/injects/status/ExecutionStatusDetail';
 import DetectionPreventionExpectationsValidationForm from '../../simulations/simulation/validation/expectations/DetectionPreventionExpectationsValidationForm';
@@ -154,7 +158,6 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
     type: '',
     key: 'attack-ended',
   }];
-  const sortOrder = ['PREVENTION', 'DETECTION', 'MANUAL'];
   // Flow
   const layoutOptions: LayoutOptions = {
     algorithm: 'd3-hierarchy',
@@ -435,11 +438,7 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
       })));
       const mergedSteps: Steptarget[] = [...computeInitialSteps(initialSteps), ...newSteps];
       // Custom sorting function
-      mergedSteps.sort((a, b) => {
-        const typeAIndex = sortOrder.indexOf(a.type);
-        const typeBIndex = sortOrder.indexOf(b.type);
-        return typeAIndex - typeBIndex;
-      });
+      mergedSteps.sort((a, b) => Object.keys(ExpectationType).indexOf(a.type as ExpectationResultType) - Object.keys(ExpectationType).indexOf(b.type as ExpectationResultType));
       setNodes(mergedSteps.map((step, index) => ({
         id: `result-${index}`,
         type: 'result',
@@ -482,7 +481,7 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
     groupedResults[type].push(result);
   });
   const sortedKeys = Object.keys(groupedResults).sort((a, b) => {
-    return sortOrder.indexOf(a) - sortOrder.indexOf(b);
+    return Object.keys(ExpectationType).indexOf(a as ExpectationResultType) - Object.keys(ExpectationType).indexOf(b as ExpectationResultType);
   });
   const sortedGroupedResults: Record<string, InjectExpectationsStore[]> = {};
   sortedKeys.forEach((key) => {
@@ -660,47 +659,47 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
                             </GridLegacy>
                           )}
                       {
-                        injectExpectation.inject_expectation_type === 'MANUAL' && injectExpectation.inject_expectation_results && injectExpectation.inject_expectation_results.map((expectationResult) => {
+                        isManualExpectation(injectExpectation.inject_expectation_type)
+                        && injectExpectation.inject_expectation_results
+                        && injectExpectation.inject_expectation_results.map((expectationResult) => {
                           return (
-                            <>
-                              <GridLegacy item={true} xs={1} style={{ textAlign: 'end' }}>
-                                <IconButton
-                                  color="primary"
-                                  onClick={(ev) => {
-                                    ev.stopPropagation();
-                                    setAnchorEls({
-                                      ...anchorEls,
-                                      [`${injectExpectation.inject_expectation_id}-${expectationResult.sourceId}`]: ev.currentTarget,
-                                    });
-                                  }}
-                                  aria-haspopup="true"
-                                  size="large"
-                                  disabled={['collector', 'media-pressure', 'challenge'].includes(expectationResult.sourceType ?? 'unknown')}
-                                >
-                                  <MoreVertOutlined />
-                                </IconButton>
-                                <Menu
-                                  anchorEl={anchorEls[`${injectExpectation.inject_expectation_id}-${expectationResult.sourceId}`]}
-                                  open={Boolean(anchorEls[`${injectExpectation.inject_expectation_id}-${expectationResult.sourceId}`])}
-                                  onClose={() => setAnchorEls({
+                            <GridLegacy key={injectExpectation.inject_expectation_id} item={true} xs={1} style={{ textAlign: 'end' }}>
+                              <IconButton
+                                color="primary"
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  setAnchorEls({
                                     ...anchorEls,
-                                    [`${injectExpectation.inject_expectation_id}-${expectationResult.sourceId}`]: null,
-                                  })}
-                                >
-                                  <MenuItem onClick={() => handleOpenResultEdition(injectExpectation, expectationResult)}>
-                                    {t('Update')}
-                                  </MenuItem>
-                                  <MenuItem onClick={() => handleOpenResultDeletion(injectExpectation, expectationResult)}>
-                                    {t('Delete')}
-                                  </MenuItem>
-                                </Menu>
-                              </GridLegacy>
-                            </>
+                                    [`${injectExpectation.inject_expectation_id}-${expectationResult.sourceId}`]: ev.currentTarget,
+                                  });
+                                }}
+                                aria-haspopup="true"
+                                size="large"
+                                disabled={['collector', 'media-pressure', 'challenge'].includes(expectationResult.sourceType ?? 'unknown')}
+                              >
+                                <MoreVertOutlined />
+                              </IconButton>
+                              <Menu
+                                anchorEl={anchorEls[`${injectExpectation.inject_expectation_id}-${expectationResult.sourceId}`]}
+                                open={Boolean(anchorEls[`${injectExpectation.inject_expectation_id}-${expectationResult.sourceId}`])}
+                                onClose={() => setAnchorEls({
+                                  ...anchorEls,
+                                  [`${injectExpectation.inject_expectation_id}-${expectationResult.sourceId}`]: null,
+                                })}
+                              >
+                                <MenuItem onClick={() => handleOpenResultEdition(injectExpectation, expectationResult)}>
+                                  {t('Update')}
+                                </MenuItem>
+                                <MenuItem onClick={() => handleOpenResultDeletion(injectExpectation, expectationResult)}>
+                                  {t('Delete')}
+                                </MenuItem>
+                              </Menu>
+                            </GridLegacy>
                           );
                         })
                       }
                       {(['DETECTION', 'PREVENTION'].includes(injectExpectation.inject_expectation_type)
-                        || (injectExpectation.inject_expectation_type === 'MANUAL'
+                        || (isManualExpectation(injectExpectation.inject_expectation_type)
                           && injectExpectation.inject_expectation_results
                           && injectExpectation.inject_expectation_results.length === 0))
                         && (
@@ -719,8 +718,8 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
                                   )
                                 }
                                 {
-                                  injectExpectation.inject_expectation_type === 'MANUAL' && (
-                                    <PersonAddOutlined fontSize="medium" />
+                                  isManualExpectation(injectExpectation.inject_expectation_type) && (
+                                    <InventoryOutlined fontSize="medium" />
                                   )
                                 }
 
@@ -740,7 +739,7 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
                         {emptyFilled(getLabelOfValidationType(injectExpectation))}
                       </div>
                     </div>
-                    {isTechnicalExpectation(injectExpectation.inject_expectation_type) && (
+                    {isTechnicalExpectation(injectExpectation.inject_expectation_type) && injectExpectation.inject_expectation_type !== 'VULNERABILITY' && (
                       <TableContainer>
                         <Table
                           size="small"
@@ -886,7 +885,7 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
             <DialogContent>
               {selectedExpectationForCreation && (
                 <>
-                  {selectedExpectationForCreation.injectExpectation.inject_expectation_type === 'MANUAL'
+                  {isManualExpectation(selectedExpectationForCreation.injectExpectation.inject_expectation_type)
                     && <ManualExpectationsValidationForm expectation={selectedExpectationForCreation.injectExpectation} onUpdate={onUpdateValidation} />}
                   {['DETECTION', 'PREVENTION'].includes(selectedExpectationForCreation.injectExpectation.inject_expectation_type)
                     && (
@@ -911,7 +910,7 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
             <DialogContent>
               {selectedResultEdition && selectedResultEdition.injectExpectation && (
                 <>
-                  {selectedResultEdition.injectExpectation.inject_expectation_type === 'MANUAL'
+                  {isManualExpectation(selectedResultEdition.injectExpectation.inject_expectation_type)
                     && (
                       <ManualExpectationsValidationForm
                         expectation={selectedResultEdition.injectExpectation}
@@ -971,11 +970,9 @@ const TargetResultsDetailFlow: FunctionComponent<Props> = ({
 
 const TargetResultsDetail: FunctionComponent<Props> = (props) => {
   return (
-    <>
-      <ReactFlowProvider>
-        <TargetResultsDetailFlow {...props} />
-      </ReactFlowProvider>
-    </>
+    <ReactFlowProvider>
+      <TargetResultsDetailFlow {...props} />
+    </ReactFlowProvider>
   );
 };
 

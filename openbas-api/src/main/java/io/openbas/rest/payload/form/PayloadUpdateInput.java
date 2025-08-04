@@ -4,6 +4,7 @@ import static io.openbas.config.AppConfig.MANDATORY_MESSAGE;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.openbas.database.model.Endpoint.PLATFORM_TYPE;
+import io.openbas.database.model.InjectExpectation;
 import io.openbas.database.model.Payload;
 import io.openbas.database.model.PayloadArgument;
 import io.openbas.database.model.PayloadPrerequisite;
@@ -42,6 +43,13 @@ public class PayloadUpdateInput {
   private Payload.PAYLOAD_EXECUTION_ARCH executionArch =
       Payload.PAYLOAD_EXECUTION_ARCH.ALL_ARCHITECTURES;
 
+  @JsonProperty("payload_expectations")
+  @NotNull
+  private InjectExpectation.EXPECTATION_TYPE[] expectations =
+      new InjectExpectation.EXPECTATION_TYPE[] {
+        InjectExpectation.EXPECTATION_TYPE.PREVENTION, InjectExpectation.EXPECTATION_TYPE.DETECTION
+      };
+
   @JsonProperty("executable_file")
   private String executableFile;
 
@@ -70,6 +78,10 @@ public class PayloadUpdateInput {
 
   @JsonProperty("payload_attack_patterns")
   private List<String> attackPatternsIds = new ArrayList<>();
+
+  @JsonProperty("payload_detection_remediations")
+  @Schema(description = "List of detection remediation gaps for collectors")
+  private List<DetectionRemediationInput> detectionRemediations = new ArrayList<>();
 
   @JsonProperty("payload_output_parsers")
   @Schema(description = "Set of output parsers")
