@@ -1382,6 +1382,7 @@ export interface Endpoint {
   /** @format date-time */
   asset_created_at: string;
   asset_description?: string;
+  asset_external_reference?: string;
   asset_id: string;
   asset_name: string;
   asset_tags?: string[];
@@ -1390,7 +1391,7 @@ export interface Endpoint {
   asset_updated_at: string;
   endpoint_arch: "x86_64" | "arm64" | "Unknown";
   endpoint_hostname?: string;
-  endpoint_ips: string[];
+  endpoint_ips?: string[];
   endpoint_is_eol?: boolean;
   endpoint_mac_addresses?: string[];
   endpoint_platform:
@@ -1408,16 +1409,13 @@ export interface Endpoint {
 
 export interface EndpointInput {
   asset_description?: string;
+  asset_external_reference?: string;
   asset_name: string;
   asset_tags?: string[];
   endpoint_agent_version?: string;
   endpoint_arch: "x86_64" | "arm64" | "Unknown";
   endpoint_hostname?: string;
-  /**
-   * @maxItems 2147483647
-   * @minItems 1
-   */
-  endpoint_ips: string[];
+  endpoint_ips?: string[];
   /** True if the endpoint is in an End of Life state */
   endpoint_is_eol?: boolean;
   endpoint_mac_addresses?: string[];
@@ -1438,6 +1436,8 @@ export interface EndpointOutput {
    * @uniqueItems true
    */
   asset_agents: AgentOutput[];
+  /** Asset external reference */
+  asset_external_reference?: string;
   /** Asset Id */
   asset_id: string;
   /** Asset name */
@@ -1526,11 +1526,7 @@ export interface EndpointRegisterInput {
   endpoint_agent_version?: string;
   endpoint_arch: "x86_64" | "arm64" | "Unknown";
   endpoint_hostname?: string;
-  /**
-   * @maxItems 2147483647
-   * @minItems 1
-   */
-  endpoint_ips: string[];
+  endpoint_ips?: string[];
   /** True if the endpoint is in an End of Life state */
   endpoint_is_eol?: boolean;
   endpoint_mac_addresses?: string[];
@@ -5114,6 +5110,7 @@ export interface SecurityPlatform {
 
 export interface SecurityPlatformInput {
   asset_description?: string;
+  asset_external_reference?: string;
   asset_name: string;
   asset_tags?: string[];
   security_platform_logo_dark?: string;
