@@ -88,9 +88,13 @@ const CustomDashboardParameters: FunctionComponent = () => {
   return (
     <div style={{
       display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 330px))',
       gap: theme.spacing(2),
     }}
     >
+      {paramsFields.length > 0 && (
+        <>{paramsFields}</>
+      )}
       {dateParameters.size > 0 && (
         <TimeRangeFilters
           timeRangeValue={getParameter(dateParameters.get('timeRange'))?.value ?? LAST_QUARTER_TIME_RANGE}
@@ -100,20 +104,10 @@ const CustomDashboardParameters: FunctionComponent = () => {
           endDateValue={getParameter(dateParameters.get('endDate'))?.value}
           handleEndDate={data => handleParametersValue(dateParameters.get('endDate'), data)}
         />
-      )}
 
-      {paramsFields.length > 0 && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 300px))',
-            gap: theme.spacing(2),
-          }}
-        >
-          {paramsFields}
-        </div>
       )}
     </div>
+
   );
 };
 
