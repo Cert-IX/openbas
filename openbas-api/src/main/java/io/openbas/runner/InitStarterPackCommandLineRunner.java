@@ -7,6 +7,7 @@ import io.openbas.database.repository.SettingRepository;
 import io.openbas.jsonapi.JsonApiDocument;
 import io.openbas.jsonapi.ResourceObject;
 import io.openbas.rest.asset.endpoint.form.EndpointInput;
+import io.openbas.rest.custom_dashboard.CustomDashboardService;
 import io.openbas.rest.tag.TagService;
 import io.openbas.rest.tag.form.TagCreateInput;
 import io.openbas.service.*;
@@ -168,7 +169,10 @@ public class InitStarterPackCommandLineRunner implements CommandLineRunner {
               try {
                 JsonApiDocument<ResourceObject> dashboard =
                     this.zipJsonService.handleImport(
-                        resourceToAdd.getContentAsByteArray(), "custom_dashboard_name", null);
+                        resourceToAdd.getContentAsByteArray(),
+                        "custom_dashboard_name",
+                        null,
+                        CustomDashboardService::sanityCheck);
                 this.setDefaultDashboard(resourceToAdd.getFilename(), dashboard.data().id());
                 log.info(
                     "Successfully imported StarterPack dashboard file : {}",
