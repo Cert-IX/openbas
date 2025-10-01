@@ -1264,6 +1264,7 @@ export type DateHistogramWidget = UtilRequiredKeys<
 };
 
 export interface DetectionRemediation {
+  author_rule: "HUMAN" | "AI" | "AI_OUTDATED";
   detection_remediation_collector_type: string;
   /** @format date-time */
   detection_remediation_created_at?: string;
@@ -1275,8 +1276,42 @@ export interface DetectionRemediation {
   listened?: boolean;
 }
 
+export interface DetectionRemediationAIOutput {
+  rules?: string;
+}
+
+/** Health check response of the detection/remediation service. */
+export interface DetectionRemediationHealthResponse {
+  /**
+   * Name of the service
+   * @example "remediation-detection-webservice"
+   */
+  service?: string;
+  /**
+   * Status of the web service. Only one possible value: "healthy"
+   * @example "healthy"
+   */
+  status?: string;
+  /**
+   * Timestamp of the request
+   * @example "2025-09-09T12:08:07.489773Z"
+   */
+  timestamp?: string;
+  /**
+   * Elapsed time between request initiation and service start. (format HH:MM:SS.ffffff,)
+   * @example "2:07:39.269613"
+   */
+  up_time?: string;
+  /**
+   * Version of the service
+   * @example "0.1.0"
+   */
+  version?: string;
+}
+
 /** List of detection remediation gaps for collectors */
 export interface DetectionRemediationInput {
+  author_rule: "HUMAN" | "AI" | "AI_OUTDATED";
   /** Collector type */
   detection_remediation_collector: string;
   detection_remediation_id?: string;
@@ -1285,6 +1320,8 @@ export interface DetectionRemediationInput {
 }
 
 export interface DetectionRemediationOutput {
+  /** Author of rules: Human, AI or AI out of date (for rules generated before payload updated) */
+  detection_remediation_author_rule: "HUMAN" | "AI" | "AI_OUTDATED";
   /** Collector type */
   detection_remediation_collector: string;
   detection_remediation_id?: string;
@@ -4479,6 +4516,51 @@ export interface PayloadExportRequestInput {
 
 export interface PayloadExportTarget {
   payload_id?: string;
+}
+
+export interface PayloadInput {
+  command_content?: string | null;
+  command_executor?: string | null;
+  dns_resolution_hostname?: string;
+  executable_file?: string;
+  file_drop_file?: string;
+  payload_arguments?: PayloadArgument[];
+  payload_attack_patterns?: string[];
+  payload_cleanup_command?: string | null;
+  payload_cleanup_executor?: string | null;
+  payload_description?: string;
+  /** List of detection remediation gaps for collectors */
+  payload_detection_remediations?: DetectionRemediationInput[];
+  payload_execution_arch: "x86_64" | "arm64" | "ALL_ARCHITECTURES";
+  payload_expectations: (
+    | "TEXT"
+    | "DOCUMENT"
+    | "ARTICLE"
+    | "CHALLENGE"
+    | "MANUAL"
+    | "PREVENTION"
+    | "DETECTION"
+    | "VULNERABILITY"
+  )[];
+  payload_name: string;
+  /**
+   * Set of output parsers
+   * @uniqueItems true
+   */
+  payload_output_parsers?: OutputParserInput[];
+  payload_platforms?: (
+    | "Linux"
+    | "Windows"
+    | "MacOS"
+    | "Container"
+    | "Service"
+    | "Generic"
+    | "Internal"
+    | "Unknown"
+  )[];
+  payload_prerequisites?: PayloadPrerequisite[];
+  payload_tags?: string[];
+  payload_type?: string;
 }
 
 export interface PayloadPrerequisite {

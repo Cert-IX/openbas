@@ -38,6 +38,12 @@ public class CollectorService {
         .orElseThrow(() -> new ElementNotFoundException("Collector not found with id: " + id));
   }
 
+  public Collector collectorByType(String type) {
+    return collectorRepository
+        .findByType(type)
+        .orElseThrow(() -> new ElementNotFoundException("Collector not found with type: " + type));
+  }
+
   public List<Collector> securityPlatformCollectors() {
     return fromIterable(collectorRepository.findAll(hasSecurityPlatform()));
   }

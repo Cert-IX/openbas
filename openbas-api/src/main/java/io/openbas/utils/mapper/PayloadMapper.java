@@ -242,7 +242,7 @@ public class PayloadMapper {
       List<DetectionRemediation> detectionRemediations) {
     if (eeService.isLicenseActive(licenseCacheManager.getEnterpriseEditionInfo())) {
       return detectionRemediations.stream()
-          .map(detectionRemediation -> toDetectionRemediationOutput(detectionRemediation))
+          .map(PayloadMapper::toDetectionRemediationOutput)
           .toList();
     } else {
       log.debug("Enterprise Edition license inactive - omitting remediation information");
@@ -250,22 +250,19 @@ public class PayloadMapper {
     }
   }
 
-  private DetectionRemediationOutput toDetectionRemediationOutput(
+  public static DetectionRemediationOutput toDetectionRemediationOutput(
       DetectionRemediation detectionRemediation) {
-    DetectionRemediationOutput output =
-        DetectionRemediationOutput.builder()
-            .id(detectionRemediation.getId())
-            .payloadId(detectionRemediation.getPayload().getId())
-            .collectorType(detectionRemediation.getCollector().getType())
-            .values(detectionRemediation.getValues())
-            .build();
-    return output;
+    return DetectionRemediationOutput.builder()
+        .id(detectionRemediation.getId())
+        .payloadId(detectionRemediation.getPayload().getId())
+        .collectorType(detectionRemediation.getCollector().getType())
+        .values(detectionRemediation.getValues())
+        .authorRule(detectionRemediation.getAuthorRule())
+        .build();
   }
 
   public static Set<RelatedEntityOutput> toRelatedEntityOutputs(Set<Payload> payloads) {
-    return payloads.stream()
-        .map(payload -> toRelatedEntityOutput(payload))
-        .collect(Collectors.toSet());
+    return payloads.stream().map(PayloadMapper::toRelatedEntityOutput).collect(Collectors.toSet());
   }
 
   private static RelatedEntityOutput toRelatedEntityOutput(Payload payload) {

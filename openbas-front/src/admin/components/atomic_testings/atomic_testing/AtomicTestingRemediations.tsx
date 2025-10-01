@@ -2,24 +2,34 @@ import { Box, Paper, Tab, Tabs, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 // eslint-disable-next-line import/no-named-as-default
 import DOMPurify from 'dompurify';
-import { type SyntheticEvent, useContext, useEffect, useMemo, useState } from 'react';
+import { type SyntheticEvent, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { makeStyles } from 'tss-react/mui';
 
 import { fetchCollectorsForAtomicTesting } from '../../../../actions/atomic_testings/atomic-testing-actions';
 import { fetchCollectors } from '../../../../actions/Collector';
 import type { CollectorHelper } from '../../../../actions/collectors/collector-helper';
+import { postDetectionRemediationAIRulesByInject } from '../../../../actions/detection-remediation/detectionremediation-action';
 import { fetchPayloadDetectionRemediationsByInject } from '../../../../actions/injects/inject-action';
 import { useFormatter } from '../../../../components/i18n';
 import Loader from '../../../../components/Loader';
 import { COLLECTOR_LIST } from '../../../../constants/Entities';
 import { useHelper } from '../../../../store';
-import { type Collector, type DetectionRemediationOutput, type InjectResultOverviewOutput } from '../../../../utils/api-types';
+import {
+  type Collector,
+  type DetectionRemediationOutput,
+  type InjectResultOverviewOutput,
+} from '../../../../utils/api-types';
 import { useAppDispatch } from '../../../../utils/hooks';
 import useDataLoader from '../../../../utils/hooks/useDataLoader';
 import { AbilityContext } from '../../../../utils/permissions/PermissionsProvider';
 import RestrictionAccess from '../../../../utils/permissions/RestrictionAccess';
 import { ACTIONS, SUBJECTS } from '../../../../utils/permissions/types';
+import { isNotEmptyField } from '../../../../utils/utils';
+import DetectionRemediationInfo from '../../payloads/form/DetectionRemediationInfo';
+import DetectionRemediationUseAriane from '../../payloads/form/DetectionRemediationUseAriane';
+import { type SnapshotEditionRemediationType } from '../../payloads/utils/SnapshotRemediationContext';
+import { useSnapshotRemediation } from '../../payloads/utils/useSnapshotRemediation';
 
 const useStyles = makeStyles()(theme => ({
   paperContainer: {
@@ -27,6 +37,14 @@ const useStyles = makeStyles()(theme => ({
     gridTemplateColumns: '1fr 1fr',
     gap: theme.spacing(3),
   },
+  headerRemediation: {
+    display: 'flex',
+    marginTop: 20,
+    width: '50%',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+
 }));
 
 const AtomicTestingRemediations = () => {
@@ -48,6 +66,13 @@ const AtomicTestingRemediations = () => {
   const [loading, setLoading] = useState(false);
 
   const { collectors } = useHelper((helper: CollectorHelper) => ({ collectors: helper.getCollectors() }));
+
+  const { snapshot, setSnapshot } = useSnapshotRemediation();
+  const [activeDetectionRemediation, setActiveDetectionRemediation] = useState<DetectionRemediationOutput>();
+
+  const [displayedText, setDisplayedText] = useState<string>('');
+  const [typing, setTyping] = useState<boolean>(!!snapshot?.get(tabs[activeTab]?.collector_type)?.isLoading);
+
   useDataLoader(() => {
     if (hasPlatformSettingsCapabilities) {
       setLoading(true);
@@ -85,6 +110,7 @@ const AtomicTestingRemediations = () => {
     if (activeTab >= tabs.length) {
       setActiveTab(0);
     }
+    setTyping(!!snapshot?.get(tabs[activeTab]?.collector_type)?.isLoading);
   }, [tabs, activeTab]);
 
   const handleActiveTabChange = (_: SyntheticEvent, newValue: number) => {
@@ -98,6 +124,66 @@ const AtomicTestingRemediations = () => {
       rem => rem.detection_remediation_collector === activeCollector.collector_type,
     );
   }, [tabs, activeTab, detectionRemediations]);
+
+  useEffect(() => {
+    setActiveDetectionRemediation(detectionRemediations.find((value) => {
+      return value.detection_remediation_collector === tabs[activeTab]?.collector_type;
+    }));
+  }, [tabs, activeTab, detectionRemediations]);
+
+  function addOrUpdateRemediation(newRemediation: DetectionRemediationOutput) {
+    if (detectionRemediations.length === 0) {
+      setDetectionRemediations([newRemediation]);
+    } else {
+      setDetectionRemediations((prev) => {
+        const index = prev.findIndex(item => item.detection_remediation_collector === newRemediation.detection_remediation_collector);
+
+        if (index === -1) {
+          return [...prev, newRemediation];
+        } else {
+          const update = [...prev];
+          update[index].detection_remediation_values = newRemediation.detection_remediation_values;
+          update[index].detection_remediation_author_rule = newRemediation.detection_remediation_author_rule;
+          return update;
+        }
+      },
+      );
+    }
+    let i = 0;
+    const text = newRemediation.detection_remediation_values;
+    const interval = setInterval(() => {
+      setDisplayedText(() => i === 0 ? (text[i]) : text.slice(0, i - 10) + (text[i]));
+      i += 10;
+      if (i >= text.length) {
+        clearInterval(interval);
+        setTyping(false);
+      }
+    }, 10);
+  }
+
+  const updateSnapshot = useCallback((tabsData: Collector[], activeTabIndex: number, isLoading?: boolean) => {
+    setSnapshot((prev) => {
+      const map = new Map(prev || []);
+      if (!tabsData || !tabsData[activeTabIndex]) return map;
+
+      map.set(tabsData[activeTabIndex].collector_type, {
+        ...map.get(tabsData[activeTabIndex].collector_type) || {},
+        isLoading: isLoading,
+      } as SnapshotEditionRemediationType);
+
+      return map;
+    });
+  }, []);
+
+  async function onClickUseAriane() {
+    updateSnapshot(tabs, activeTab, true);
+    setTyping(true);
+    return postDetectionRemediationAIRulesByInject(injectId, tabs[activeTab].collector_type).then((value) => {
+      addOrUpdateRemediation(value.data);
+    }).finally(() => {
+      updateSnapshot(tabs, activeTab, false);
+    });
+  }
 
   return (
     <>
@@ -137,39 +223,82 @@ const AtomicTestingRemediations = () => {
                       />
                     ))}
                   </Tabs>
-
+                  <div className={classes.headerRemediation}>
+                    {isNotEmptyField(activeDetectionRemediation?.detection_remediation_values)
+                      && <DetectionRemediationInfo author_rule={activeDetectionRemediation?.detection_remediation_author_rule} />}
+                  </div>
                   <Paper className={classes.paperContainer} variant="outlined">
                     {activeCollectorRemediations.length === 0 ? (
-                      <Typography sx={{ padding: 2 }} variant="body2" color="textSecondary" gutterBottom>
-                        {t('No detection rule available for this security platform yet.')}
-                      </Typography>
+                      <>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}
+                        >
+                          <Typography sx={{ padding: 2 }} variant="body2" color="textSecondary" gutterBottom>
+                            {t('No detection rule available for this security platform yet.')}
+                          </Typography>
+                          <DetectionRemediationUseAriane
+                            collectorType={tabs[activeTab].collector_type}
+                            detectionRemediationContent={activeDetectionRemediation?.detection_remediation_values}
+                            onSubmit={onClickUseAriane}
+                          />
+                        </div>
+                      </>
                     ) : (
                       activeCollectorRemediations.map((rem) => {
                         const content = rem.detection_remediation_values?.trim();
 
                         return (
-                          <Box sx={{ padding: 2 }} key={rem.detection_remediation_id}>
+                          <div key={'paper.' + rem.detection_remediation_id}>
                             {content ? (
                               <>
-                                <Typography
-                                  sx={{ paddingBottom: 2 }}
-                                  variant="body2"
-                                  fontWeight="bold"
-                                  gutterBottom
-                                >
-                                  {`${t('Detection Rule')}: `}
-                                </Typography>
-                                <div
-                                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(rem.detection_remediation_values.replace(/\n/g, '<br />')) }}
-                                >
-                                </div>
+                                <Box sx={{ padding: 2 }} key={rem.detection_remediation_id}>
+                                  <Typography
+                                    sx={{ paddingBottom: 2 }}
+                                    variant="body2"
+                                    fontWeight="bold"
+                                    gutterBottom
+                                  >
+                                    {`${t('Detection Rule')}: `}
+                                  </Typography>
+                                  <p>{typing}</p>
+                                  {typing
+                                    ? (
+                                        <div
+                                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(displayedText?.replace(/\n/g, '')) }}
+                                        >
+                                        </div>
+                                      )
+                                    : (
+                                        <div
+                                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(rem.detection_remediation_values.replace(/\n/g, '')) }}
+                                        >
+                                        </div>
+                                      )}
+                                </Box>
                               </>
                             ) : (
-                              <Typography variant="body2" color="textSecondary" gutterBottom>
-                                {t('No detection rule available for this security platform yet.')}
-                              </Typography>
+                              <>
+
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                }}
+                                >
+                                  <Typography sx={{ padding: 2 }} variant="body2" color="textSecondary" gutterBottom>
+                                    {t('No detection rule available for this security platform yet.')}
+                                  </Typography>
+
+                                  <DetectionRemediationUseAriane
+                                    collectorType={tabs[activeTab].collector_type}
+                                    detectionRemediationContent={activeDetectionRemediation?.detection_remediation_values}
+                                    onSubmit={onClickUseAriane}
+                                  />
+                                </div>
+                              </>
                             )}
-                          </Box>
+                          </div>
                         );
                       })
                     )}

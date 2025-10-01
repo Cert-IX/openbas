@@ -4,12 +4,7 @@ import * as R from 'ramda';
 import { useContext, useState } from 'react';
 import { useDispatch } from 'react-redux';
 
-import {
-  deletePayload,
-  duplicatePayload,
-  exportPayload,
-  updatePayload,
-} from '../../../actions/payloads/payload-actions';
+import { deletePayload, duplicatePayload, exportPayload, updatePayload } from '../../../actions/payloads/payload-actions';
 import DialogDelete from '../../../components/common/DialogDelete';
 import Drawer from '../../../components/common/Drawer';
 import Transition from '../../../components/common/Transition';
@@ -18,6 +13,7 @@ import { AbilityContext, Can } from '../../../utils/permissions/PermissionsProvi
 import { ACTIONS, SUBJECTS } from '../../../utils/permissions/types.js';
 import { download } from '../../../utils/utils.js';
 import PayloadForm from './PayloadForm';
+import SnapshotRemediationProvider from './utils/SnapshotRemediationProvider.js';
 
 const PayloadPopover = ({ payload, onUpdate, onDelete, onDuplicate, disableUpdate, disableDelete }) => {
   const [openDuplicate, setOpenDuplicate] = useState(false);
@@ -59,6 +55,7 @@ const PayloadPopover = ({ payload, onUpdate, onDelete, onDuplicate, disableUpdat
         detection_remediation_collector: value[0],
         detection_remediation_values: value[1].content,
         detection_remediation_id: value[1].remediationId,
+        author_rule: value[1].author_rule,
       }))),
     )(data);
     return dispatch(updatePayload(payload.payload_id, inputValues)).then((result) => {
@@ -132,6 +129,7 @@ const PayloadPopover = ({ payload, onUpdate, onDelete, onDuplicate, disableUpdat
     initialValues.remediations[remediation.detection_remediation_collector_type] = {
       content: remediation.detection_remediation_values,
       remediationId: remediation.detection_remediation_id,
+      author_rule: remediation.author_rule,
     };
   });
   const hasUpdateCapability = ability.can(ACTIONS.MANAGE, SUBJECTS.PAYLOADS) || ability.can(ACTIONS.MANAGE, SUBJECTS.RESOURCE, payload.payload_id);
@@ -184,7 +182,14 @@ const PayloadPopover = ({ payload, onUpdate, onDelete, onDuplicate, disableUpdat
         handleClose={handleCloseEdit}
         title={t('Update the payload')}
       >
-        <PayloadForm onSubmit={onSubmitEdit} handleClose={handleCloseEdit} editing initialValues={initialValues} />
+        <SnapshotRemediationProvider>
+          <PayloadForm
+            onSubmit={onSubmitEdit}
+            handleClose={handleCloseEdit}
+            editing
+            initialValues={initialValues}
+          />
+        </SnapshotRemediationProvider>
       </Drawer>
     </>
   );

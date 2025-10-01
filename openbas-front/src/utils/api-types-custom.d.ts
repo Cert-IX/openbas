@@ -61,6 +61,7 @@ export type WidgetInput = Omit<ApiTypes.WidgetInput, 'widget_config'> & { widget
 export type Widget = Omit<ApiTypes.Widget, 'widget_config'> & { widget_config: DateHistogramWidget | StructuralHistogramWidget | ListConfiguration | FlatConfiguration };
 type PayloadCreateInputOmit = 'payload_type' | 'payload_source' | 'payload_status' | 'payload_created_at' | 'payload_id' | 'payload_updated_at' | 'payload_output_parsers';
 type PayloadCreateInputMore = {
+  remediations?: Record<string, DetectionRemediationInput>;
   payload_output_parsers?: (
     Omit<ApiTypes.OutputParser, 'output_parser_created_at' | 'output_parser_updated_at' | 'output_parser_id' | 'output_parser_contract_output_elements'>
     & {
@@ -83,7 +84,7 @@ export interface ChoiceItem {
   label: string;
   value: string;
   information: string;
-};
+}
 
 export interface ContractElement {
   key: string;

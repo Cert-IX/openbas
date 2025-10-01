@@ -1,6 +1,7 @@
 package io.openbas.rest.payload.form;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.openbas.database.model.DetectionRemediation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -20,4 +21,8 @@ public class DetectionRemediationInput {
   @Schema(description = "Value of detection remediation, for exemple: query for sentinel")
   @NotNull
   private String values;
+
+  @JsonProperty("author_rule")
+  @NotNull
+  private DetectionRemediation.AUTHOR_RULE authorRule = DetectionRemediation.AUTHOR_RULE.HUMAN;
 }

@@ -61,6 +61,7 @@ class CreatePayload extends Component {
         detection_remediation_collector: value[0],
         detection_remediation_values: value[1].content,
         detection_remediation_id: value[1].remediationId,
+        author_rule: value[1].author_rule,
       }))),
     )(data);
     return this.props

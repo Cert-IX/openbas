@@ -248,4 +248,8 @@ public class AttackPatternService {
     return getAttackPatternsByExternalIds(getExternalIds(stixRefs)).stream()
         .collect(Collectors.toMap(attack -> attack.getId(), Function.identity()));
   }
+
+  public List<AttackPattern> getAttackPattern(List<String> idsAttackPattern) {
+    return attackPatternRepository.findAllByIdIn(idsAttackPattern);
+  }
 }
