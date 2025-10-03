@@ -8,7 +8,7 @@ import static io.openaev.helper.StreamHelper.fromIterable;
 import static io.openaev.utils.JpaUtils.arrayAggOnId;
 import static io.openaev.utils.StringUtils.duplicateString;
 import static io.openaev.utils.constants.Constants.ARTICLES;
-import static io.openaev.utils.pagination.SortUtilsCriteriaBuilder.toSortCriteriaBuilder;
+import static io.openaev.utils.pagination.SortUtilsCriteriaBuilder.toSortCriteriaBuilderWithNullHandling;
 import static java.time.Instant.now;
 import static java.util.Collections.emptyList;
 import static java.util.Optional.ofNullable;
@@ -24,7 +24,6 @@ import io.openaev.database.repository.*;
 import io.openaev.ee.Ee;
 import io.openaev.expectation.ExpectationType;
 import io.openaev.rest.atomic_testing.form.TargetSimple;
-import io.openaev.rest.dashboard.DashboardService;
 import io.openaev.rest.document.DocumentService;
 import io.openaev.rest.exception.ElementNotFoundException;
 import io.openaev.rest.exercise.form.ExerciseSimple;
@@ -35,8 +34,6 @@ import io.openaev.rest.inject.service.InjectDuplicateService;
 import io.openaev.rest.inject.service.InjectService;
 import io.openaev.rest.scenario.service.ScenarioStatisticService;
 import io.openaev.rest.team.output.TeamOutput;
-import io.openaev.service.*;
-import io.openaev.service.GrantService;
 import io.openaev.service.TagRuleService;
 import io.openaev.service.TeamService;
 import io.openaev.service.UserService;
@@ -50,6 +47,7 @@ import io.openaev.utils.TargetType;
 import io.openaev.utils.mapper.ExerciseMapper;
 import io.openaev.utils.mapper.InjectExpectationMapper;
 import io.openaev.utils.mapper.InjectMapper;
+import io.openaev.utils.pagination.SortUtilsCriteriaBuilder;
 import jakarta.annotation.Resource;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -84,7 +82,6 @@ public class ExerciseService {
   @PersistenceContext private EntityManager entityManager;
 
   private final Ee eeService;
-  private final GrantService grantService;
   private final InjectDuplicateService injectDuplicateService;
   private final TeamService teamService;
   private final VariableService variableService;
@@ -93,7 +90,6 @@ public class ExerciseService {
   private final InjectService injectService;
   private final CronService cronService;
   private final UserService userService;
-  private final DashboardService dashboardService;
 
   private final ExerciseMapper exerciseMapper;
   private final InjectMapper injectMapper;
@@ -451,10 +447,19 @@ public class ExerciseService {
       Pageable pageable,
       Map<String, Join<Base, Base>> joinMap) {
     CriteriaBuilder cb = this.entityManager.getCriteriaBuilder();
-
     CriteriaQuery<Tuple> cq = cb.createTupleQuery();
     Root<Exercise> exerciseRoot = cq.from(Exercise.class);
-    select(cb, cq, exerciseRoot, joinMap);
+
+    // -- Sorting --
+    SortUtilsCriteriaBuilder.SortSpecification sortSpecification =
+        toSortCriteriaBuilderWithNullHandling(cb, exerciseRoot, pageable.getSort());
+    cq.orderBy(sortSpecification.orders());
+
+    // -- Select
+    List<Selection<?>> selections = getCriteriaBuilderSelections(cb, exerciseRoot, joinMap);
+    cq.groupBy(Collections.singletonList(exerciseRoot.get("id")));
+    selections.addAll(sortSpecification.selections());
+    cq.multiselect(selections).distinct(true);
 
     // -- Text Search and Filters --
     if (specification != null) {
@@ -463,10 +468,6 @@ public class ExerciseService {
         cq.where(predicate);
       }
     }
-
-    // -- Sorting --
-    List<Order> orders = toSortCriteriaBuilder(cb, exerciseRoot, pageable.getSort());
-    cq.orderBy(orders);
 
     // Type Query
     TypedQuery<Tuple> query = entityManager.createQuery(cq);
@@ -510,11 +511,10 @@ public class ExerciseService {
   private record CriteriaBuilderAndExercises(CriteriaBuilder cb, List<ExerciseSimple> exercises) {}
 
   // -- SELECT --
-  private void select(
-      CriteriaBuilder cb,
-      CriteriaQuery<Tuple> cq,
-      Root<Exercise> exerciseRoot,
-      Map<String, Join<Base, Base>> joinMap) {
+  private List<Selection<?>> getCriteriaBuilderSelections(
+      CriteriaBuilder cb, Root<Exercise> exerciseRoot, Map<String, Join<Base, Base>> joinMap) {
+    List<Selection<?>> selections = new ArrayList<>();
+
     // Array aggregations
     Join<Base, Base> exerciseTagsJoin = exerciseRoot.join("tags", JoinType.LEFT);
     joinMap.put("tags", exerciseTagsJoin);
@@ -525,21 +525,21 @@ public class ExerciseService {
     joinMap.put("injects", injectsJoin);
     Expression<String[]> injectIdsExpression =
         arrayAggOnId((HibernateCriteriaBuilder) cb, injectsJoin);
-    // SELECT
-    cq.multiselect(
-            exerciseRoot.get("id").alias("exercise_id"),
-            exerciseRoot.get("name").alias("exercise_name"),
-            exerciseRoot.get("status").alias("exercise_status"),
-            exerciseRoot.get("subtitle").alias("exercise_subtitle"),
-            exerciseRoot.get("category").alias("exercise_category"),
-            exerciseRoot.get("start").alias("exercise_start_date"),
-            exerciseRoot.get("updatedAt").alias("exercise_updated_at"),
-            tagIdsExpression.alias("exercise_tags"),
-            injectIdsExpression.alias("exercise_injects"))
-        .distinct(true);
+
+    // SELECTIONS
+    selections.add(exerciseRoot.get("id").alias("exercise_id"));
+    selections.add(exerciseRoot.get("name").alias("exercise_name"));
+    selections.add(exerciseRoot.get("status").alias("exercise_status"));
+    selections.add(exerciseRoot.get("subtitle").alias("exercise_subtitle"));
+    selections.add(exerciseRoot.get("category").alias("exercise_category"));
+    selections.add(exerciseRoot.get("start").alias("exercise_start_date"));
+    selections.add(exerciseRoot.get("end").alias("exercise_end_date"));
+    selections.add(exerciseRoot.get("updatedAt").alias("exercise_updated_at"));
+    selections.add(tagIdsExpression.alias("exercise_tags"));
+    selections.add(injectIdsExpression.alias("exercise_injects"));
 
     // GROUP BY
-    cq.groupBy(Collections.singletonList(exerciseRoot.get("id")));
+    return selections;
   }
 
   // -- EXECUTION --
