@@ -179,7 +179,7 @@ public class InitStarterPackCommandLineRunnerTest extends IntegrationTest {
     ReflectionTestUtils.setField(initStarterPackCommandLineRunner, "isStarterPackEnabled", true);
     doThrow(new IOException())
         .when(mockZipJsonService)
-        .handleImport(any(), eq("custom_dashboard_name"), isNull(), isNull());
+        .handleImport(any(), eq("custom_dashboard_name"), isNull(), isNull(), eq(""));
 
     // EXECUTE
     initStarterPackCommandLineRunner.run();
@@ -321,23 +321,20 @@ public class InitStarterPackCommandLineRunnerTest extends IntegrationTest {
     assertEquals(1, scenarios.size());
 
     Scenario scenario = scenarios.getFirst();
-    assertEquals("starterpack (Import)", scenario.getName());
+    assertEquals("starterpack", scenario.getName());
   }
 
   private void verifyDashboardExist() {
     long dashboardCount = customDashboardRepository.count();
     assertEquals(3, dashboardCount);
 
-    Optional<CustomDashboard> dashboardTest =
-        customDashboardRepository.findByName("Test 1 (Import)");
+    Optional<CustomDashboard> dashboardTest = customDashboardRepository.findByName("Test 1");
     assertTrue(dashboardTest.isPresent());
 
-    Optional<CustomDashboard> dashboardTest2 =
-        customDashboardRepository.findByName("Test 2 (Import)");
+    Optional<CustomDashboard> dashboardTest2 = customDashboardRepository.findByName("Test 2");
     assertTrue(dashboardTest2.isPresent());
 
-    Optional<CustomDashboard> dashboardTest3 =
-        customDashboardRepository.findByName("Test 3 (Import)");
+    Optional<CustomDashboard> dashboardTest3 = customDashboardRepository.findByName("Test 3");
     assertTrue(dashboardTest3.isPresent());
   }
 
@@ -347,8 +344,7 @@ public class InitStarterPackCommandLineRunnerTest extends IntegrationTest {
   }
 
   private void verifyDefaultHomeDashboardParameterExist() {
-    Optional<CustomDashboard> dashboardTest =
-        customDashboardRepository.findByName("Test 1 (Import)");
+    Optional<CustomDashboard> dashboardTest = customDashboardRepository.findByName("Test 1");
     assertTrue(dashboardTest.isPresent());
 
     Optional<Setting> staticsParameters = settingRepository.findByKey("platform_home_dashboard");
@@ -357,8 +353,7 @@ public class InitStarterPackCommandLineRunnerTest extends IntegrationTest {
   }
 
   private void verifyDefaultScenarioDashboardParameterExist() {
-    Optional<CustomDashboard> dashboardTest =
-        customDashboardRepository.findByName("Test 2 (Import)");
+    Optional<CustomDashboard> dashboardTest = customDashboardRepository.findByName("Test 2");
     assertTrue(dashboardTest.isPresent());
 
     Optional<Setting> staticsParameters =
@@ -368,8 +363,7 @@ public class InitStarterPackCommandLineRunnerTest extends IntegrationTest {
   }
 
   private void verifyDefaultSimulationDashboardParameterExist() {
-    Optional<CustomDashboard> dashboardTest =
-        customDashboardRepository.findByName("Test 3 (Import)");
+    Optional<CustomDashboard> dashboardTest = customDashboardRepository.findByName("Test 3");
     assertTrue(dashboardTest.isPresent());
 
     Optional<Setting> staticsParameters =
