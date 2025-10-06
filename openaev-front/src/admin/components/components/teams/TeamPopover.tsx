@@ -8,6 +8,7 @@ import { deleteTeam, updateTeam } from '../../../../actions/teams/team-actions';
 import { type TeamsHelper } from '../../../../actions/teams/team-helper';
 import ButtonPopover from '../../../../components/common/ButtonPopover';
 import Dialog from '../../../../components/common/dialog/Dialog';
+import DialogDelete from '../../../../components/common/DialogDelete';
 import Transition from '../../../../components/common/Transition';
 import { useFormatter } from '../../../../components/i18n';
 import { useHelper } from '../../../../store';
@@ -171,24 +172,12 @@ const TeamPopover: FunctionComponent<TeamPopoverProps> = ({
   return (
     <>
       <ButtonPopover disabled={disabled} entries={entries} variant="icon" />
-      <MuiDialog
+      <DialogDelete
         open={openDelete}
-        TransitionComponent={Transition}
-        onClose={handleCloseDelete}
-        PaperProps={{ elevation: 1 }}
-      >
-        <DialogContent>
-          <DialogContentText>
-            {t('Do you want to delete this team?')}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDelete}>{t('Cancel')}</Button>
-          <Button color="secondary" onClick={submitDelete}>
-            {t('Delete')}
-          </Button>
-        </DialogActions>
-      </MuiDialog>
+        handleClose={handleCloseDelete}
+        handleSubmit={submitDelete}
+        text={t('Do you want to delete this team?')}
+      />
       <Dialog
         open={openEdit}
         handleClose={handleCloseEdit}

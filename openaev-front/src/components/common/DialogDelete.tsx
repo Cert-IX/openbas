@@ -1,5 +1,6 @@
 import { Button, Dialog as DialogMUI, DialogActions, DialogContent, DialogContentText } from '@mui/material';
 import type React from 'react';
+import { useState } from 'react';
 import { type FunctionComponent } from 'react';
 
 import { useFormatter } from '../i18n';
@@ -8,7 +9,7 @@ import Transition from './Transition';
 interface DialogDeleteProps {
   open: boolean;
   handleClose: () => void;
-  handleSubmit: () => void;
+  handleSubmit: (() => void) | (() => Promise<void>) | null | undefined;
   text: string;
   richContent?: React.ReactNode;
 }
@@ -16,11 +17,19 @@ interface DialogDeleteProps {
 const DialogDelete: FunctionComponent<DialogDeleteProps> = ({
   open = false,
   handleClose,
-  handleSubmit,
+  handleSubmit = undefined,
   text,
   richContent,
 }) => {
   const { t } = useFormatter();
+
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const handleLoadingAndSubmit = () => {
+    setLoading(true);
+    if (handleSubmit)
+      handleSubmit();
+  };
 
   return (
     <DialogMUI
@@ -39,7 +48,7 @@ const DialogDelete: FunctionComponent<DialogDeleteProps> = ({
       <DialogActions>
         <Button onClick={handleClose}>{t('Cancel')}</Button>
         {handleSubmit && (
-          <Button color="secondary" onClick={handleSubmit}>
+          <Button color="secondary" loading={loading} onClick={handleLoadingAndSubmit}>
             {t('Delete')}
           </Button>
         )}
