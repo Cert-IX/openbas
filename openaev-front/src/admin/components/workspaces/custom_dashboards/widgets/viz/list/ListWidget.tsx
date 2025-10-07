@@ -5,7 +5,6 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Tooltip,
 } from '@mui/material';
 import { useNavigate } from 'react-router';
 import { makeStyles } from 'tss-react/mui';
@@ -17,14 +16,13 @@ import SortHeadersComponentV2 from '../../../../../../../components/common/query
 import useBodyItemsStyles from '../../../../../../../components/common/queryable/style/style';
 import { useQueryableWithLocalStorage } from '../../../../../../../components/common/queryable/useQueryableWithLocalStorage';
 import { useFormatter } from '../../../../../../../components/i18n';
-import ItemStatus from '../../../../../../../components/ItemStatus';
 import { useHelper } from '../../../../../../../store';
 import { type EsBase } from '../../../../../../../utils/api-types';
 import { type ListConfiguration } from '../../../../../../../utils/api-types-custom';
 import buildStyles from './elements/ColumnStyles';
 import DefaultElementStyles from './elements/DefaultElementStyles';
 import EndpointElementStyles from './elements/EndpointElementStyles';
-import listConfigRenderer from './elements/ListColumnConfig';
+import listConfigRenderer, { defaultRenderer } from './elements/ListColumnConfig';
 import navigationHandlers from './elements/ListNavigationHandler';
 
 const useStyles = makeStyles()(() => ({
@@ -75,28 +73,12 @@ const ListWidget = ({ widgetConfig, elements }: Props) => {
     column: string,
     element: EsBase,
   ) => {
-    const renderer = listConfigRenderer[column];
+    const renderer = listConfigRenderer[column] ?? defaultRenderer;
     const value = element[column as keyof typeof element] as string | boolean | string[] | boolean[];
-    if (renderer) {
-      return renderer(value, {
-        element,
-        attackPatterns,
-      });
-    }
-
-    const text = value?.toString() ?? '';
-
-    if (column.toLowerCase().includes('status')) {
-      return (
-        <ItemStatus label={text} variant="inList" />
-      );
-    }
-
-    return (
-      <Tooltip title={text} placement="bottom-start">
-        <span>{text}</span>
-      </Tooltip>
-    );
+    return renderer(value, {
+      element,
+      attackPatterns,
+    });
   };
 
   const onListItemClick = (element: EsBase): void => {
