@@ -13,6 +13,7 @@ import io.openaev.aop.RBAC;
 import io.openaev.database.model.*;
 import io.openaev.database.raw.RawPaginationScenario;
 import io.openaev.database.repository.*;
+import io.openaev.healthcheck.dto.HealthCheck;
 import io.openaev.rest.custom_dashboard.CustomDashboardService;
 import io.openaev.rest.document.DocumentService;
 import io.openaev.rest.exception.ElementNotFoundException;
@@ -119,6 +120,15 @@ public class ScenarioApi extends RestBehavior {
       resourceType = ResourceType.SCENARIO)
   public Scenario scenario(@PathVariable @NotBlank final String scenarioId) {
     return scenarioService.scenario(scenarioId);
+  }
+
+  @GetMapping(SCENARIO_URI + "/{scenarioId}/healthchecks")
+  @RBAC(
+      resourceId = "#scenarioId",
+      actionPerformed = Action.READ,
+      resourceType = ResourceType.SCENARIO)
+  public List<HealthCheck> streamHealthChecks(@PathVariable @NotBlank final String scenarioId) {
+    return scenarioService.runChecks(scenarioId);
   }
 
   @PutMapping(SCENARIO_URI + "/{scenarioId}")

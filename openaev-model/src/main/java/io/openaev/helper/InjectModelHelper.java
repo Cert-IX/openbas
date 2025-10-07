@@ -310,6 +310,34 @@ public class InjectModelHelper {
     return isSet;
   }
 
+  public static boolean isDetectionOrPrevention(@NotNull final ObjectNode content) {
+    if (content == null
+        || content.get("expectations") == null
+        || content.get("expectations").isNull()) {
+      return false;
+    }
+
+    JsonNode valueNode = content.get("expectations");
+
+    List<InjectExpectation.EXPECTATION_TYPE> values = new ArrayList<>();
+    if (valueNode.isArray()) {
+      for (JsonNode node : valueNode) {
+        if (!node.isNull()
+            && !node.get("expectation_type").isNull()
+            && (InjectExpectation.EXPECTATION_TYPE.DETECTION.equals(
+                    InjectExpectation.EXPECTATION_TYPE.valueOf(
+                        node.get("expectation_type").asText()))
+                || InjectExpectation.EXPECTATION_TYPE.PREVENTION.equals(
+                    InjectExpectation.EXPECTATION_TYPE.valueOf(
+                        node.get("expectation_type").asText())))) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   public static List<String> getFieldValue(
       @NotNull final List<String> teams,
       @NotNull final List<String> assets,

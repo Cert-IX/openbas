@@ -1,6 +1,7 @@
 package io.openaev.injectors.lade;
 
 import io.openaev.integrations.InjectorService;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -14,7 +15,15 @@ public class LadeInjector {
   public LadeInjector(InjectorService injectorService, LadeContract contract) {
     try {
       injectorService.register(
-          LADE_INJECTOR_ID, LADE_INJECTOR_NAME, contract, false, "cyber-range", null, null, false);
+          LADE_INJECTOR_ID,
+          LADE_INJECTOR_NAME,
+          contract,
+          false,
+          "cyber-range",
+          null,
+          null,
+          false,
+          List.of());
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

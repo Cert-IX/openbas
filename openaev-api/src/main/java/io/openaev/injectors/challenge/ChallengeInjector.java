@@ -1,6 +1,8 @@
 package io.openaev.injectors.challenge;
 
+import io.openaev.healthcheck.enums.ExternalServiceDependency;
 import io.openaev.integrations.InjectorService;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -21,7 +23,8 @@ public class ChallengeInjector {
           "capture-the-flag",
           null,
           null,
-          false);
+          false,
+          List.of(ExternalServiceDependency.SMTP, ExternalServiceDependency.IMAP));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

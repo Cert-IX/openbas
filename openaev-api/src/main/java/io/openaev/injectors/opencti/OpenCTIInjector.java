@@ -1,6 +1,7 @@
 package io.openaev.injectors.opencti;
 
 import io.openaev.integrations.InjectorService;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -21,7 +22,8 @@ public class OpenCTIInjector {
           "incident-response",
           null,
           null,
-          false);
+          false,
+          List.of());
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

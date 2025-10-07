@@ -1,19 +1,18 @@
 package io.openaev.execution;
 
 import static io.openaev.executors.crowdstrike.service.CrowdStrikeExecutorService.CROWDSTRIKE_EXECUTOR_NAME;
-import static io.openaev.executors.crowdstrike.service.CrowdStrikeExecutorService.CROWDSTRIKE_EXECUTOR_TYPE;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.openaev.database.model.*;
 import io.openaev.database.repository.ExecutionTraceRepository;
 import io.openaev.executors.ExecutorContextService;
+import io.openaev.executors.utils.ExecutorUtils;
 import io.openaev.rest.exception.AgentException;
 import io.openaev.rest.inject.output.AgentsAndAssetsAgentless;
 import io.openaev.rest.inject.service.InjectService;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -26,9 +25,9 @@ import org.springframework.stereotype.Service;
 public class ExecutionExecutorService {
 
   private final ApplicationContext context;
-
   private final ExecutionTraceRepository executionTraceRepository;
   private final InjectService injectService;
+  private final ExecutorUtils executorUtils;
 
   public void launchExecutorContext(Inject inject) {
     InjectStatus injectStatus =
@@ -42,16 +41,11 @@ public class ExecutionExecutorService {
     saveAgentlessAssetsTraces(assetsAgentless, injectStatus);
     // Filter each list to do something for each specific case and then remove the specific agents
     // from the main "agents" list to execute payloads at the end for the remaining "normal" agents
-    Set<Agent> inactiveAgents =
-        agents.stream().filter(agent -> !agent.isActive()).collect(Collectors.toSet());
+    Set<Agent> inactiveAgents = executorUtils.foundInactiveAgents(agents);
     agents.removeAll(inactiveAgents);
-    Set<Agent> agentsWithoutExecutor =
-        agents.stream().filter(agent -> agent.getExecutor() == null).collect(Collectors.toSet());
+    Set<Agent> agentsWithoutExecutor = executorUtils.foundAgentsWithoutExecutor(agents);
     agents.removeAll(agentsWithoutExecutor);
-    Set<Agent> crowdstrikeAgents =
-        agents.stream()
-            .filter(agent -> CROWDSTRIKE_EXECUTOR_TYPE.equals(agent.getExecutor().getType()))
-            .collect(Collectors.toSet());
+    Set<Agent> crowdstrikeAgents = executorUtils.foundCrowdstrikeAgents(agents);
     agents.removeAll(crowdstrikeAgents);
 
     AtomicBoolean atLeastOneExecution = new AtomicBoolean(false);

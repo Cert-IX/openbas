@@ -2572,6 +2572,27 @@ export interface GroupUpdateUsersInput {
   group_users?: string[];
 }
 
+/** Healthchecks of the inject */
+export interface HealthCheck {
+  /**
+   * Date when the failure have been found
+   * @format date-time
+   */
+  creation_date: string;
+  /** Detail of the check failure */
+  detail: "SERVICE_UNAVAILABLE" | "NOT_READY" | "EMPTY";
+  /** Define if it's an error or a warning */
+  status: "ERROR" | "WARNING";
+  /** Type of the check, could be a service, an attribute, etc */
+  type:
+    | "SMTP"
+    | "IMAP"
+    | "AGENT_OR_EXECUTOR"
+    | "SECURITY_SYSTEM_COLLECTOR"
+    | "INJECT"
+    | "TEAMS";
+}
+
 export interface HistogramWidget {
   date_attribute: string;
   display_legend?: boolean;
@@ -2644,6 +2665,7 @@ export interface ImportPostSummary {
 
 export interface ImportTestSummary {
   import_message?: ImportMessage[];
+  /** @deprecated */
   injects?: InjectOutput[];
   /** @format int32 */
   total_injects?: number;
@@ -2681,6 +2703,7 @@ export interface Inject {
   inject_exercise?: string;
   inject_expectations?: string[];
   inject_id: string;
+  /** Injector contract of the inject */
   inject_injector_contract?: InjectorContract;
   inject_kill_chain_phases?: KillChainPhase[];
   inject_ready?: boolean;
@@ -2739,6 +2762,7 @@ export interface InjectBulkUpdateOperation {
   values?: string[];
 }
 
+/** Inject dependencies of the inject */
 export interface InjectDependency {
   dependency_condition?: InjectDependencyCondition;
   /** @format date-time */
@@ -2982,22 +3006,33 @@ export interface InjectOutput {
   inject_assets?: string[];
   inject_content?: object;
   /**
+   * Depend duration of the inject
    * @format int64
    * @min 0
    */
   inject_depends_duration: number;
   inject_depends_on?: InjectDependency[];
+  /** Enabled state of the inject */
   inject_enabled?: boolean;
+  /** Simulation ID of the inject */
   inject_exercise?: string;
+  inject_healthchecks?: HealthCheck[];
+  /** ID of the inject */
   inject_id: string;
+  /** Injector contract of the inject */
   inject_injector_contract?: InjectorContract;
+  /** Ready state of the inject */
   inject_ready?: boolean;
+  /** Scenario ID of the inject */
   inject_scenario?: string;
   /** @uniqueItems true */
   inject_tags?: string[];
   inject_teams?: string[];
+  /** Testable state of the inject */
   inject_testable?: boolean;
+  /** Title of the inject */
   inject_title: string;
+  /** Type of the inject */
   inject_type?: string;
 }
 
@@ -3154,6 +3189,7 @@ export interface Injector {
   /** @format date-time */
   injector_created_at: string;
   injector_custom_contracts?: boolean;
+  injector_dependencies?: ("SMTP" | "IMAP")[];
   injector_executor_clear_commands?: Record<string, string>;
   injector_executor_commands?: Record<string, string>;
   injector_external?: boolean;
@@ -3176,6 +3212,7 @@ export interface InjectorConnection {
   vhost?: string;
 }
 
+/** Injector contract of the inject */
 export interface InjectorContract {
   convertedContent?: object;
   injector_contract_arch?: "x86_64" | "arm64" | "ALL_ARCHITECTURES";
@@ -4738,6 +4775,8 @@ export interface PlatformSettings {
    * @format int64
    */
   expectation_vulnerability_expiration_time: number;
+  /** IMAP Service availability */
+  imap_service_available?: string;
   /** Current version of Java */
   java_version?: string;
   /** URL of the server containing the map tile with dark theme */
@@ -4790,6 +4829,8 @@ export interface PlatformSettings {
   postgre_version?: string;
   /** Current version of RabbitMQ */
   rabbitmq_version?: string;
+  /** SMTP Service availability */
+  smtp_service_available?: string;
   /** True if telemetry manager enable */
   telemetry_manager_enable?: boolean;
   /** True if connection with XTM Hub is enabled */

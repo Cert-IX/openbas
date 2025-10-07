@@ -12,6 +12,7 @@ import io.openaev.database.model.InjectorContract;
 import io.openaev.database.repository.AttackPatternRepository;
 import io.openaev.database.repository.InjectorContractRepository;
 import io.openaev.database.repository.InjectorRepository;
+import io.openaev.healthcheck.enums.ExternalServiceDependency;
 import io.openaev.injector_contract.Contract;
 import io.openaev.injector_contract.Contractor;
 import io.openaev.service.FileService;
@@ -69,7 +70,8 @@ public class InjectorService {
       String category,
       Map<String, String> executorCommands,
       Map<String, String> executorClearCommands,
-      Boolean isPayloads)
+      Boolean isPayloads,
+      List<ExternalServiceDependency> dependencies)
       throws Exception {
     if (!contractor.isExpose()) {
       Injector injector = injectorRepository.findById(id).orElse(null);
@@ -106,6 +108,7 @@ public class InjectorService {
       injector.setExecutorClearCommands(executorClearCommands);
       injector.setPayloads(isPayloads);
       injector.setUpdatedAt(Instant.now());
+      injector.setDependencies(dependencies.toArray(new ExternalServiceDependency[0]));
       List<String> existing = new ArrayList<>();
       List<InjectorContract> toUpdates = new ArrayList<>();
       List<String> toDeletes = new ArrayList<>();
@@ -206,6 +209,7 @@ public class InjectorService {
       newInjector.setExecutorCommands(executorCommands);
       newInjector.setExecutorClearCommands(executorClearCommands);
       newInjector.setPayloads(isPayloads);
+      newInjector.setDependencies(dependencies.toArray(new ExternalServiceDependency[0]));
       Injector savedInjector = injectorRepository.save(newInjector);
       // Save the contracts
       List<InjectorContract> injectorContracts =

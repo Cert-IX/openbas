@@ -29,8 +29,10 @@ import io.openaev.database.repository.*;
 import io.openaev.database.specification.ScenarioSpecification;
 import io.openaev.ee.Ee;
 import io.openaev.export.Mixins;
+import io.openaev.healthcheck.dto.HealthCheck;
+import io.openaev.healthcheck.utils.HealthCheckUtils;
 import io.openaev.helper.ObjectMapperHelper;
-import io.openaev.rest.dashboard.DashboardService;
+import io.openaev.rest.collector.service.CollectorService;
 import io.openaev.rest.exception.ElementNotFoundException;
 import io.openaev.rest.exercise.exports.ExerciseFileExport;
 import io.openaev.rest.exercise.exports.VariableMixin;
@@ -40,10 +42,12 @@ import io.openaev.rest.inject.service.InjectDuplicateService;
 import io.openaev.rest.inject.service.InjectService;
 import io.openaev.rest.scenario.export.ScenarioFileExport;
 import io.openaev.rest.scenario.form.ScenarioSimple;
+import io.openaev.rest.scenario.response.ScenarioOutput;
 import io.openaev.rest.team.output.TeamOutput;
 import io.openaev.telemetry.metric_collectors.ActionMetricCollector;
 import io.openaev.utils.TargetType;
 import io.openaev.utils.mapper.ExerciseMapper;
+import io.openaev.utils.mapper.ScenarioMapper;
 import io.openaev.utils.pagination.SearchPaginationInput;
 import jakarta.annotation.Resource;
 import jakarta.persistence.EntityManager;
@@ -115,10 +119,14 @@ public class ScenarioService {
   private final TagRuleService tagRuleService;
   private final InjectService injectService;
   private final UserService userService;
-  private final DashboardService dashboardService;
+  private final CollectorService collectorService;
 
   private final InjectRepository injectRepository;
   private final LessonsCategoryRepository lessonsCategoryRepository;
+
+  private final HealthCheckUtils healthCheckUtils;
+
+  private final ScenarioMapper scenarioMapper;
 
   @Transactional
   public Scenario createScenario(@NotNull final Scenario scenario) {
@@ -887,5 +895,66 @@ public class ScenarioService {
       duplicatedObjectives.add(duplicatedObjective);
     }
     scenario.setObjectives(duplicatedObjectives);
+  }
+
+  /**
+   * Verify all healthcheck for a given scenario id
+   *
+   * @param scenarioId to verify
+   * @return founded healthcheck list
+   */
+  @Transactional(readOnly = true)
+  public List<HealthCheck> runChecks(String scenarioId) {
+    if (scenarioId == null) {
+      return null;
+    }
+
+    List<Collector> collectors = this.collectorService.securityPlatformCollectors();
+
+    Scenario scenario = this.scenario(scenarioId);
+    ScenarioOutput scenarioOutput = scenarioMapper.toScenarioOutput(scenario);
+    scenarioOutput.setInjects(
+        scenario.getInjects().stream()
+            .map(inject -> injectService.runChecks(inject, collectors))
+            .toList());
+
+    scenarioOutput
+        .getHealthchecks()
+        .addAll(
+            healthCheckUtils.runInjectsInErrorChecks(
+                scenarioOutput,
+                HealthCheck.Type.SMTP,
+                HealthCheck.Detail.SERVICE_UNAVAILABLE,
+                HealthCheck.Status.ERROR));
+    scenarioOutput
+        .getHealthchecks()
+        .addAll(
+            healthCheckUtils.runInjectsInErrorChecks(
+                scenarioOutput,
+                HealthCheck.Type.IMAP,
+                HealthCheck.Detail.SERVICE_UNAVAILABLE,
+                HealthCheck.Status.WARNING));
+    scenarioOutput
+        .getHealthchecks()
+        .addAll(
+            healthCheckUtils.runInjectsInErrorChecks(
+                scenarioOutput,
+                HealthCheck.Type.AGENT_OR_EXECUTOR,
+                HealthCheck.Detail.EMPTY,
+                HealthCheck.Status.ERROR));
+    scenarioOutput
+        .getHealthchecks()
+        .addAll(
+            healthCheckUtils.runInjectsInErrorChecks(
+                scenarioOutput,
+                HealthCheck.Type.SECURITY_SYSTEM_COLLECTOR,
+                HealthCheck.Detail.EMPTY,
+                HealthCheck.Status.ERROR));
+    scenarioOutput
+        .getHealthchecks()
+        .addAll(healthCheckUtils.runMissingContentChecks(scenarioOutput));
+    scenarioOutput.getHealthchecks().addAll(healthCheckUtils.runTeamsChecks(scenarioOutput));
+
+    return scenarioOutput.getHealthchecks();
   }
 }

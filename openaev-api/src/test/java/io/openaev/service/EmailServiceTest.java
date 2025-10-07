@@ -7,6 +7,7 @@ import io.openaev.IntegrationTest;
 import io.openaev.database.model.Execution;
 import io.openaev.execution.ExecutionContext;
 import io.openaev.injectors.email.service.EmailService;
+import io.openaev.injectors.email.service.SmtpService;
 import io.openaev.utils.fixtures.UserFixture;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
@@ -15,16 +16,16 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 @ExtendWith(MockitoExtension.class)
 class EmailServiceTest extends IntegrationTest {
 
-  @Mock private JavaMailSender emailSender;
-  @InjectMocks private EmailService emailService;
+  @MockBean private SmtpService smtpService;
+
+  @Autowired private EmailService emailService;
 
   @Test
   void shouldSetReplyToInHeaderEqualsToFrom() throws Exception {
@@ -33,7 +34,8 @@ class EmailServiceTest extends IntegrationTest {
     Execution execution = new Execution();
     ExecutionContext userContext = new ExecutionContext(UserFixture.getSavedUser(), null);
 
-    when(emailSender.createMimeMessage()).thenReturn(new MimeMessage((Session) null));
+    when(smtpService.createMimeMessage()).thenReturn(new MimeMessage((Session) null));
+
     emailService.sendEmail(
         execution,
         List.of(userContext),
@@ -44,7 +46,7 @@ class EmailServiceTest extends IntegrationTest {
         "subject",
         "message",
         Collections.emptyList());
-    verify(emailSender).send(argument.capture());
+    verify(smtpService).send(argument.capture());
     assertEquals("user@openaev.io", argument.getValue().getHeader("From")[0]);
     assertEquals("user-reply-to@openaev.io", argument.getValue().getHeader("Reply-To")[0]);
   }

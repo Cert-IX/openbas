@@ -5,8 +5,8 @@ import static io.openaev.injectors.email.EmailContract.EMAIL_DEFAULT;
 import static io.openaev.utils.fixtures.InjectFixture.getInjectForEmailContract;
 import static io.openaev.utils.fixtures.TeamFixture.getTeam;
 import static io.openaev.utils.fixtures.UserFixture.getUser;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static java.time.Instant.now;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import io.openaev.IntegrationTest;
@@ -15,7 +15,11 @@ import io.openaev.database.model.*;
 import io.openaev.database.model.Tag;
 import io.openaev.database.repository.*;
 import io.openaev.ee.Ee;
-import io.openaev.rest.dashboard.DashboardService;
+import io.openaev.healthcheck.dto.HealthCheck;
+import io.openaev.healthcheck.enums.ExternalServiceDependency;
+import io.openaev.healthcheck.utils.HealthCheckUtils;
+import io.openaev.rest.collector.service.CollectorService;
+import io.openaev.rest.inject.output.InjectOutput;
 import io.openaev.rest.inject.service.InjectDuplicateService;
 import io.openaev.rest.inject.service.InjectService;
 import io.openaev.telemetry.metric_collectors.ActionMetricCollector;
@@ -24,10 +28,9 @@ import io.openaev.utils.fixtures.AssetGroupFixture;
 import io.openaev.utils.fixtures.ScenarioFixture;
 import io.openaev.utils.fixtures.TagFixture;
 import io.openaev.utils.mapper.ExerciseMapper;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import io.openaev.utils.mapper.InjectMapper;
+import io.openaev.utils.mapper.ScenarioMapper;
+import java.util.*;
 import org.junit.jupiter.api.*;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -49,6 +52,8 @@ class ScenarioServiceTest extends IntegrationTest {
   @Autowired InjectRepository injectRepository;
   @Autowired private InjectorContractRepository injectorContractRepository;
   @Autowired private LessonsCategoryRepository lessonsCategoryRepository;
+  @Autowired private HealthCheckUtils healthCheckUtils;
+  @Autowired private InjectMapper injectMapper;
 
   @Mock Ee eeService;
   @Mock GrantService grantService;
@@ -60,8 +65,9 @@ class ScenarioServiceTest extends IntegrationTest {
   @Mock private InjectService injectService;
   @Mock private TagRuleService tagRuleService;
   @Mock private UserService userService;
-  @Mock private DashboardService dashboardService;
+  @Mock private CollectorService collectorService;
   @InjectMocks private ScenarioService scenarioService;
+  @Autowired private ScenarioMapper scenarioMapper;
 
   @Mock private LicenseCacheManager licenseCacheManager;
   @Autowired private ExerciseMapper exerciseMapper;
@@ -93,9 +99,11 @@ class ScenarioServiceTest extends IntegrationTest {
             tagRuleService,
             injectService,
             userService,
-            dashboardService,
+            collectorService,
             injectRepository,
-            lessonsCategoryRepository);
+            lessonsCategoryRepository,
+            healthCheckUtils,
+            scenarioMapper);
   }
 
   void setUpWithMockRepository() {
@@ -119,9 +127,11 @@ class ScenarioServiceTest extends IntegrationTest {
             tagRuleService,
             injectService,
             userService,
-            dashboardService,
+            collectorService,
             injectRepository,
-            lessonsCategoryRepository);
+            lessonsCategoryRepository,
+            healthCheckUtils,
+            scenarioMapper);
   }
 
   @AfterAll
@@ -308,6 +318,242 @@ class ScenarioServiceTest extends IntegrationTest {
     scenarioService.updateScenario(scenario, currentTags, false);
 
     verify(injectService, never()).applyDefaultAssetGroupsToInject(any(), any());
+  }
+
+  @Test
+  public void testRunChecksWhenScenarioIsNull() {
+    List<HealthCheck> healthchecks = scenarioService.runChecks(null);
+
+    assertNull(healthchecks);
+  }
+
+  @Test
+  @Transactional
+  public void testRunChecksForSmtpIssue() {
+    // PREPARE
+    Inject inject = new Inject();
+    Scenario scenario = new Scenario();
+    scenario.setInjects(new HashSet<>(List.of(inject)));
+    this.scenarioRepository.save(scenario);
+
+    HealthCheck healthCheck =
+        new HealthCheck(
+            HealthCheck.Type.SMTP,
+            HealthCheck.Detail.SERVICE_UNAVAILABLE,
+            HealthCheck.Status.ERROR,
+            now());
+    InjectOutput injectOutput = injectMapper.toInjectOuput(inject);
+    injectOutput.setHealthchecks(List.of(healthCheck));
+
+    // MOCK
+    when(this.collectorService.securityPlatformCollectors()).thenReturn(new ArrayList<>());
+    when(this.injectService.runChecks(any(), any())).thenReturn(injectOutput);
+
+    // RUN
+    List<HealthCheck> healthchecks = scenarioService.runChecks(scenario.getId());
+
+    // VERIFY
+    assertFalse(healthchecks.isEmpty());
+
+    HealthCheck healthCheckToVerify =
+        healthchecks.stream()
+            .filter(hc -> HealthCheck.Type.SMTP.equals(hc.getType()))
+            .findFirst()
+            .orElse(new HealthCheck(null, null, null, null));
+    assertEquals(HealthCheck.Type.SMTP, healthCheckToVerify.getType());
+    assertEquals(HealthCheck.Detail.SERVICE_UNAVAILABLE, healthCheckToVerify.getDetail());
+    assertEquals(HealthCheck.Status.ERROR, healthCheckToVerify.getStatus());
+  }
+
+  @Test
+  @Transactional
+  public void testRunChecksForImapIssue() {
+    // PREPARE
+    Inject inject = new Inject();
+    Scenario scenario = new Scenario();
+    scenario.setInjects(new HashSet<>(List.of(inject)));
+    this.scenarioRepository.save(scenario);
+
+    HealthCheck healthCheck =
+        new HealthCheck(
+            HealthCheck.Type.IMAP,
+            HealthCheck.Detail.SERVICE_UNAVAILABLE,
+            HealthCheck.Status.WARNING,
+            now());
+    InjectOutput injectOutput = injectMapper.toInjectOuput(inject);
+    injectOutput.setHealthchecks(List.of(healthCheck));
+
+    // MOCK
+    when(this.collectorService.securityPlatformCollectors()).thenReturn(new ArrayList<>());
+    when(this.injectService.runChecks(any(), any())).thenReturn(injectOutput);
+
+    // RUN
+    List<HealthCheck> healthchecks = scenarioService.runChecks(scenario.getId());
+
+    // VERIFY
+    assertFalse(healthchecks.isEmpty());
+
+    HealthCheck healthCheckToVerify =
+        healthchecks.stream()
+            .filter(hc -> HealthCheck.Type.IMAP.equals(hc.getType()))
+            .findFirst()
+            .orElse(new HealthCheck(null, null, null, null));
+    assertEquals(HealthCheck.Type.IMAP, healthCheckToVerify.getType());
+    assertEquals(HealthCheck.Detail.SERVICE_UNAVAILABLE, healthCheckToVerify.getDetail());
+    assertEquals(HealthCheck.Status.WARNING, healthCheckToVerify.getStatus());
+  }
+
+  @Test
+  @Transactional
+  public void testRunChecksForExecutorIssue() {
+    // PREPARE
+    Inject inject = new Inject();
+    Scenario scenario = new Scenario();
+    scenario.setInjects(new HashSet<>(List.of(inject)));
+    this.scenarioRepository.save(scenario);
+
+    HealthCheck healthCheck =
+        new HealthCheck(
+            HealthCheck.Type.AGENT_OR_EXECUTOR,
+            HealthCheck.Detail.EMPTY,
+            HealthCheck.Status.ERROR,
+            now());
+    InjectOutput injectOutput = injectMapper.toInjectOuput(inject);
+    injectOutput.setHealthchecks(List.of(healthCheck));
+
+    // MOCK
+    when(this.collectorService.securityPlatformCollectors()).thenReturn(new ArrayList<>());
+    when(this.injectService.runChecks(any(), any())).thenReturn(injectOutput);
+
+    // RUN
+    List<HealthCheck> healthchecks = scenarioService.runChecks(scenario.getId());
+
+    // VERIFY
+    assertFalse(healthchecks.isEmpty());
+
+    HealthCheck healthCheckToVerify =
+        healthchecks.stream()
+            .filter(hc -> HealthCheck.Type.AGENT_OR_EXECUTOR.equals(hc.getType()))
+            .findFirst()
+            .orElse(new HealthCheck(null, null, null, null));
+    assertEquals(HealthCheck.Type.AGENT_OR_EXECUTOR, healthCheckToVerify.getType());
+    assertEquals(HealthCheck.Detail.EMPTY, healthCheckToVerify.getDetail());
+    assertEquals(HealthCheck.Status.ERROR, healthCheckToVerify.getStatus());
+  }
+
+  @Test
+  @Transactional
+  public void testRunChecksForCollectorIssue() {
+    // PREPARE
+    Inject inject = new Inject();
+    Scenario scenario = new Scenario();
+    scenario.setInjects(new HashSet<>(List.of(inject)));
+    this.scenarioRepository.save(scenario);
+
+    HealthCheck healthCheck =
+        new HealthCheck(
+            HealthCheck.Type.SECURITY_SYSTEM_COLLECTOR,
+            HealthCheck.Detail.EMPTY,
+            HealthCheck.Status.ERROR,
+            now());
+    InjectOutput injectOutput = injectMapper.toInjectOuput(inject);
+    injectOutput.setHealthchecks(List.of(healthCheck));
+
+    // MOCK
+    when(this.collectorService.securityPlatformCollectors()).thenReturn(new ArrayList<>());
+    when(this.injectService.runChecks(any(), any())).thenReturn(injectOutput);
+
+    // RUN
+    List<HealthCheck> healthchecks = scenarioService.runChecks(scenario.getId());
+
+    // VERIFY
+    assertFalse(healthchecks.isEmpty());
+
+    HealthCheck healthCheckToVerify =
+        healthchecks.stream()
+            .filter(hc -> HealthCheck.Type.SECURITY_SYSTEM_COLLECTOR.equals(hc.getType()))
+            .findFirst()
+            .orElse(new HealthCheck(null, null, null, null));
+    assertEquals(HealthCheck.Type.SECURITY_SYSTEM_COLLECTOR, healthCheckToVerify.getType());
+    assertEquals(HealthCheck.Detail.EMPTY, healthCheckToVerify.getDetail());
+    assertEquals(HealthCheck.Status.ERROR, healthCheckToVerify.getStatus());
+  }
+
+  @Test
+  @Transactional
+  public void testRunChecksForMissingContentIssue() {
+    // PREPARE
+    Inject inject = new Inject();
+    Scenario scenario = new Scenario();
+    scenario.setInjects(new HashSet<>(List.of(inject)));
+    this.scenarioRepository.save(scenario);
+
+    HealthCheck healthCheck =
+        new HealthCheck(
+            HealthCheck.Type.INJECT,
+            HealthCheck.Detail.NOT_READY,
+            HealthCheck.Status.WARNING,
+            now());
+    InjectOutput injectOutput = injectMapper.toInjectOuput(inject);
+    injectOutput.setHealthchecks(List.of(healthCheck));
+
+    // MOCK
+    when(this.collectorService.securityPlatformCollectors()).thenReturn(new ArrayList<>());
+    when(this.injectService.runChecks(any(), any())).thenReturn(injectOutput);
+
+    // RUN
+    List<HealthCheck> healthchecks = scenarioService.runChecks(scenario.getId());
+
+    // VERIFY
+    assertFalse(healthchecks.isEmpty());
+
+    HealthCheck healthCheckToVerify =
+        healthchecks.stream()
+            .filter(hc -> HealthCheck.Type.INJECT.equals(hc.getType()))
+            .findFirst()
+            .orElse(new HealthCheck(null, null, null, null));
+    assertEquals(HealthCheck.Type.INJECT, healthCheckToVerify.getType());
+    assertEquals(HealthCheck.Detail.NOT_READY, healthCheckToVerify.getDetail());
+    assertEquals(HealthCheck.Status.WARNING, healthCheckToVerify.getStatus());
+  }
+
+  @Test
+  @Transactional
+  public void testRunChecksForTeamsIssue() {
+    // PREPARE
+    Inject inject = new Inject();
+    Scenario scenario = new Scenario();
+    scenario.setInjects(new HashSet<>(List.of(inject)));
+
+    Injector injector = new Injector();
+    injector.setDependencies(
+        new ExternalServiceDependency[] {
+          ExternalServiceDependency.SMTP, ExternalServiceDependency.IMAP
+        });
+    InjectorContract injectorContract = new InjectorContract();
+    injectorContract.setInjector(injector);
+    InjectOutput injectOutput = injectMapper.toInjectOuput(inject);
+    injectOutput.setInjectorContract(injectorContract);
+    this.scenarioRepository.save(scenario);
+
+    // MOCK
+    when(this.collectorService.securityPlatformCollectors()).thenReturn(new ArrayList<>());
+    when(this.injectService.runChecks(any(), any())).thenReturn(injectOutput);
+
+    // RUN
+    List<HealthCheck> healthchecks = scenarioService.runChecks(scenario.getId());
+
+    // VERIFY
+    assertFalse(healthchecks.isEmpty());
+
+    HealthCheck healthCheckToVerify =
+        healthchecks.stream()
+            .filter(hc -> HealthCheck.Type.TEAMS.equals(hc.getType()))
+            .findFirst()
+            .orElse(new HealthCheck(null, null, null, null));
+    assertEquals(HealthCheck.Type.TEAMS, healthCheckToVerify.getType());
+    assertEquals(HealthCheck.Detail.EMPTY, healthCheckToVerify.getDetail());
+    assertEquals(HealthCheck.Status.WARNING, healthCheckToVerify.getStatus());
   }
 
   private AssetGroup getAssetGroup(String name) {
