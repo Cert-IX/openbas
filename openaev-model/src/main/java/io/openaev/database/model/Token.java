@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.Objects;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UuidGenerator;
 
 @Setter
@@ -43,6 +44,7 @@ public class Token implements Base {
 
   @Column(name = "token_created_at")
   @JsonProperty("token_created_at")
+  @CreationTimestamp
   @NotNull
   private Instant created;
 

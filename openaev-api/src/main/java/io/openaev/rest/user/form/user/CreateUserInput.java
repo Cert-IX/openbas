@@ -2,12 +2,14 @@ package io.openaev.rest.user.form.user;
 
 import static io.openaev.config.AppConfig.EMAIL_FORMAT;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -44,4 +46,8 @@ public class CreateUserInput {
   @JsonProperty("user_tags")
   @Schema(description = "Tags of the user")
   private List<String> tagIds = new ArrayList<>();
+
+  @JsonIgnore
+  @Schema(description = "Optional discrete authentication token")
+  private String token = UUID.randomUUID().toString();
 }

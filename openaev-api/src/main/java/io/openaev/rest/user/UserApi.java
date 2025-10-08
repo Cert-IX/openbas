@@ -1,8 +1,6 @@
 package io.openaev.rest.user;
 
 import static io.openaev.database.specification.UserSpecification.fromIds;
-import static io.openaev.helper.DatabaseHelper.updateRelation;
-import static io.openaev.helper.StreamHelper.iterableToSet;
 
 import io.openaev.aop.RBAC;
 import io.openaev.aop.UserRoleDescription;
@@ -11,8 +9,6 @@ import io.openaev.database.model.Action;
 import io.openaev.database.model.ResourceType;
 import io.openaev.database.model.User;
 import io.openaev.database.raw.RawUser;
-import io.openaev.database.repository.OrganizationRepository;
-import io.openaev.database.repository.TagRepository;
 import io.openaev.database.repository.UserRepository;
 import io.openaev.rest.exception.ElementNotFoundException;
 import io.openaev.rest.exception.InputValidationException;
@@ -65,9 +61,7 @@ public class UserApi extends RestBehavior {
 
   PassiveExpiringMap<String, String> resetTokenMap = new PassiveExpiringMap<>(1000 * 60 * 10);
   @Resource private SessionManager sessionManager;
-  private OrganizationRepository organizationRepository;
   private UserRepository userRepository;
-  private TagRepository tagRepository;
   private UserService userService;
   private MailingService mailingService;
   private UserCriteriaBuilderService userCriteriaBuilderService;
@@ -75,16 +69,6 @@ public class UserApi extends RestBehavior {
   @Autowired
   public void setMailingService(MailingService mailingService) {
     this.mailingService = mailingService;
-  }
-
-  @Autowired
-  public void setTagRepository(TagRepository tagRepository) {
-    this.tagRepository = tagRepository;
-  }
-
-  @Autowired
-  public void setOrganizationRepository(OrganizationRepository organizationRepository) {
-    this.organizationRepository = organizationRepository;
   }
 
   @Autowired
@@ -275,14 +259,7 @@ public class UserApi extends RestBehavior {
   public User updateUser(
       @PathVariable @Schema(description = "ID of the user") String userId,
       @Valid @RequestBody UpdateUserInput input) {
-    User user = userRepository.findById(userId).orElseThrow(ElementNotFoundException::new);
-    user.setUpdateAttributes(input);
-    user.setTags(iterableToSet(tagRepository.findAllById(input.getTagIds())));
-    user.setOrganization(
-        updateRelation(input.getOrganizationId(), user.getOrganization(), organizationRepository));
-    User savedUser = userRepository.save(user);
-    sessionManager.refreshUserSessions(savedUser);
-    return savedUser;
+    return userService.updateUser(userId, input);
   }
 
   @DeleteMapping("/api/users/{userId}")

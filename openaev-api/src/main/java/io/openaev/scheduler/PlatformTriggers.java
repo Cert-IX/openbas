@@ -70,4 +70,16 @@ public class PlatformTriggers {
         .withSchedule(_15_seconds)
         .build();
   }
+
+  @Bean
+  @Profile("!test")
+  public Trigger connectorPingTrigger() {
+    // 40 seconds is recommended for OCTI connectors pings
+    SimpleScheduleBuilder _40_seconds = simpleSchedule().withIntervalInSeconds(40).repeatForever();
+    return newTrigger()
+        .forJob(this.platformJobs.getConnectorPingJob())
+        .withIdentity("connectorPingJob")
+        .withSchedule(_40_seconds)
+        .build();
+  }
 }

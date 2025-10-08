@@ -37,6 +37,7 @@ public enum ResourceType {
   GROUP_ROLE,
   ORGANIZATION,
   COLLECTOR,
+  STIX_BUNDLE,
 
   // Special resource types
   UNKNOWN,

@@ -1,0 +1,98 @@
+package io.openaev.opencti.connectors.impl;
+
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+
+import io.openaev.IntegrationTest;
+import io.openaev.api.stix_process.StixApi;
+import io.openaev.config.OpenAEVConfig;
+import io.openaev.utils.mockConfig.WithMockSecurityCoverageConnectorConfig;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+public class SecurityCoverageConnectorTest extends IntegrationTest {
+
+  @Nested
+  @DisplayName("Remote URL override")
+  public class RemoteUrlOverride {
+    @Nested
+    @WithMockSecurityCoverageConnectorConfig(url = "https://opencti")
+    @SpringBootTest
+    @DisplayName("With only OpenCTI URL defined as FQDN")
+    public class WithOnlyOpenCTIURLDefinedAsFQDN {
+      @Autowired private SecurityCoverageConnector connector;
+
+      @Test
+      @DisplayName("it appends the graphql endpoint to the url")
+      public void itAppendsTheGraphQLEndpointToTheURL() {
+        assertThat(connector.getUrl()).isEqualTo("https://opencti/graphql");
+      }
+    }
+
+    @Nested
+    @WithMockSecurityCoverageConnectorConfig(url = "https://opencti/")
+    @SpringBootTest
+    @DisplayName("With only OpenCTI URL defined as FQDN with trailing slash")
+    public class WithOnlyOpenCTIURLDefinedAsFQDNWithTrailingSlash {
+      @Autowired private SecurityCoverageConnector connector;
+
+      @Test
+      @DisplayName("it appends the graphql endpoint to the url")
+      public void itAppendsTheGraphQLEndpointToTheURL() {
+        assertThat(connector.getUrl()).isEqualTo("https://opencti/graphql");
+      }
+    }
+
+    @Nested
+    @WithMockSecurityCoverageConnectorConfig(url = "https://opencti/graphql")
+    @SpringBootTest
+    @DisplayName("With only OpenCTI URL defined as FQDN with graphql endpoint set")
+    public class WithOnlyOpenCTIURLDefinedAsFQDNWithGraphqlEndpointSet {
+      @Autowired private SecurityCoverageConnector connector;
+
+      @Test
+      @DisplayName("it appends the graphql endpoint to the url")
+      public void itAppendsTheGraphQLEndpointToTheURL() {
+        assertThat(connector.getUrl()).isEqualTo("https://opencti/graphql");
+      }
+    }
+  }
+
+  @Nested
+  @DisplayName("Listen Callback URI override")
+  public class ListenCallbackURIOverride {
+    @Nested
+    @SpringBootTest
+    @WithMockSecurityCoverageConnectorConfig(listenCallbackURI = "some_url")
+    @DisplayName("When listen callback URI is set")
+    public class WhenListenCallbackURIIsSet {
+      @Autowired private OpenAEVConfig mainConfig;
+      @Autowired private SecurityCoverageConnector connector;
+
+      @Test
+      @DisplayName("it ignores and overrides it")
+      public void itIgnoresAndOverridesIt() {
+        assertThat(connector.getListenCallbackURI())
+            .isEqualTo(mainConfig.getBaseUrl() + StixApi.STIX_URI + "/process-bundle");
+      }
+    }
+
+    @Nested
+    @SpringBootTest
+    @WithMockSecurityCoverageConnectorConfig
+    @DisplayName("When listen callback URI is NOT set")
+    public class WhenListenCallbackURIIsNOTSet {
+      @Autowired private OpenAEVConfig mainConfig;
+      @Autowired private SecurityCoverageConnector connector;
+
+      @Test
+      @DisplayName("it has the expected value")
+      public void itIgnoresAndOverridesIt() {
+        assertThat(connector.getListenCallbackURI())
+            .isEqualTo(mainConfig.getBaseUrl() + StixApi.STIX_URI + "/process-bundle");
+      }
+    }
+  }
+}

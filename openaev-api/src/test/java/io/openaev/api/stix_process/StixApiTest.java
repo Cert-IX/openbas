@@ -40,7 +40,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @TestInstance(PER_CLASS)
 @Transactional
-@WithMockUser(isAdmin = true)
+@WithMockUser(withCapabilities = {Capability.MANAGE_STIX_BUNDLE})
 @DisplayName("STIX API Integration Tests")
 class StixApiTest extends IntegrationTest {
 
@@ -715,6 +715,7 @@ class StixApiTest extends IntegrationTest {
 
     @Test
     @DisplayName("Should not duplicate security coverage reference when scenario is duplicated")
+    @WithMockUser(withCapabilities = {Capability.MANAGE_STIX_BUNDLE, Capability.MANAGE_ASSESSMENT})
     void shouldNotDuplicatedReferenceSecurityCoverage() throws Exception {
 
       String response =

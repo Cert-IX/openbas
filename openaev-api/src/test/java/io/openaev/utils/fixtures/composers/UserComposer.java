@@ -1,6 +1,7 @@
 package io.openaev.utils.fixtures.composers;
 
 import io.openaev.database.model.Tag;
+import io.openaev.database.model.Token;
 import io.openaev.database.model.User;
 import io.openaev.database.repository.UserRepository;
 import java.util.ArrayList;
@@ -18,9 +19,19 @@ public class UserComposer extends ComposerBase<User> {
     private OrganizationComposer.Composer organizationComposer;
     private final List<TagComposer.Composer> tagComposers = new ArrayList<>();
     private final List<GroupComposer.Composer> groupComposers = new ArrayList<>();
+    private final List<TokenComposer.Composer> tokenComposers = new ArrayList<>();
 
     public Composer(User user) {
       this.user = user;
+    }
+
+    public Composer withToken(TokenComposer.Composer tokenComposer) {
+      this.tokenComposers.add(tokenComposer);
+      List<Token> tempTokens = this.user.getTokens();
+      tokenComposer.get().setUser(this.user);
+      tempTokens.add(tokenComposer.get());
+      this.user.setTokens(tempTokens);
+      return this;
     }
 
     public Composer withOrganization(OrganizationComposer.Composer organizationComposer) {
@@ -56,11 +67,13 @@ public class UserComposer extends ComposerBase<User> {
       }
       this.groupComposers.forEach(GroupComposer.Composer::persist);
       userRepository.save(user);
+      this.tokenComposers.forEach(TokenComposer.Composer::persist);
       return this;
     }
 
     @Override
     public Composer delete() {
+      this.tokenComposers.forEach(TokenComposer.Composer::delete);
       userRepository.delete(user);
       if (organizationComposer != null) {
         organizationComposer.delete();

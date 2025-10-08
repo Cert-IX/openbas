@@ -15,4 +15,7 @@ public enum Action {
 
   // Special actions for specific use cases
   SKIP_RBAC, // Used to skip RBAC checks in specific cases
+
+  // specific to stix bundle processing
+  PROCESS,
 }

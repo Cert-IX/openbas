@@ -8,6 +8,7 @@ import static java.time.Instant.now;
 
 import io.openaev.config.OpenAEVPrincipal;
 import io.openaev.config.SessionHelper;
+import io.openaev.config.SessionManager;
 import io.openaev.database.model.Group;
 import io.openaev.database.model.Token;
 import io.openaev.database.model.User;
@@ -15,12 +16,11 @@ import io.openaev.database.repository.*;
 import io.openaev.database.specification.GroupSpecification;
 import io.openaev.rest.exception.ElementNotFoundException;
 import io.openaev.rest.user.form.user.CreateUserInput;
+import io.openaev.rest.user.form.user.UpdateUserInput;
+import jakarta.annotation.Resource;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -34,7 +34,7 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class UserService {
-
+  @Resource private SessionManager sessionManager;
   private final Argon2PasswordEncoder passwordEncoder =
       Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
   private UserRepository userRepository;
@@ -89,10 +89,14 @@ public class UserService {
   }
 
   public void createUserToken(User user) {
+    createUserToken(user, UUID.randomUUID().toString());
+  }
+
+  private void createUserToken(User user, String discreteToken) {
     Token token = new Token();
     token.setUser(user);
     token.setCreated(now());
-    token.setValue(UUID.randomUUID().toString());
+    token.setValue(discreteToken);
     tokenRepository.save(token);
   }
 
@@ -116,8 +120,27 @@ public class UserService {
     user.setGroups(assignableGroups);
     // Save the user
     User savedUser = userRepository.save(user);
-    createUserToken(savedUser);
+    createUserToken(savedUser, input.getToken());
     return savedUser;
+  }
+
+  public User updateUser(String userId, UpdateUserInput input) {
+    User user = userRepository.findById(userId).orElseThrow(ElementNotFoundException::new);
+    return this.updateUser(user, input);
+  }
+
+  public User updateUser(User user, UpdateUserInput input) {
+    user.setUpdateAttributes(input);
+    user.setTags(iterableToSet(tagRepository.findAllById(input.getTagIds())));
+    user.setOrganization(
+        updateRelation(input.getOrganizationId(), user.getOrganization(), organizationRepository));
+    User savedUser = userRepository.save(user);
+    sessionManager.refreshUserSessions(savedUser);
+    return savedUser;
+  }
+
+  public Optional<User> findByToken(@NotBlank final String token) {
+    return this.userRepository.findByToken(token);
   }
 
   public User user(@NotBlank final String userId) {

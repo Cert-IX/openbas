@@ -221,7 +221,8 @@ public enum Capability {
       pair(ResourceType.MAPPER, Action.WRITE),
       pair(ResourceType.GROUP_ROLE, Action.DELETE),
       pair(ResourceType.USER_GROUP, Action.DELETE),
-      pair(ResourceType.USER, Action.DELETE));
+      pair(ResourceType.USER, Action.DELETE)),
+  MANAGE_STIX_BUNDLE(null, pair(ResourceType.STIX_BUNDLE, Action.PROCESS));
 
   private record ResourceTypeActionPair(ResourceType resource, Action action) {}
 

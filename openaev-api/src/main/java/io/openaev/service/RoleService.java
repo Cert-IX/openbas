@@ -39,7 +39,16 @@ public class RoleService {
       @NotBlank final String roleName,
       @NotBlank final String roleDescription,
       @NotNull final Set<Capability> capabilities) {
+    return createRole(UUID.randomUUID().toString(), roleName, roleDescription, capabilities);
+  }
+
+  public Role createRole(
+      @NotBlank final String id,
+      @NotBlank final String roleName,
+      @NotBlank final String roleDescription,
+      @NotNull final Set<Capability> capabilities) {
     Role role = new Role();
+    role.setId(id);
     role.setName(roleName);
     role.setDescription(roleDescription);
     role.setCapabilities(getCapabilitiesWithParents(capabilities));

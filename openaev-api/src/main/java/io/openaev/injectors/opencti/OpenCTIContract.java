@@ -17,7 +17,7 @@ import io.openaev.database.model.Variable.VariableType;
 import io.openaev.injector_contract.*;
 import io.openaev.injector_contract.fields.ContractElement;
 import io.openaev.injector_contract.fields.ContractExpectations;
-import io.openaev.injectors.opencti.config.OpenCTIConfig;
+import io.openaev.opencti.config.OpenCTIConfig;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;

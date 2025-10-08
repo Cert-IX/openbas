@@ -34,4 +34,8 @@ public class StringUtils {
     int b = random.nextInt(256);
     return String.format("#%02X%02X%02X", r, g, b);
   }
+
+  public static boolean isBlank(String str) {
+    return org.apache.commons.lang3.StringUtils.isBlank(str);
+  }
 }

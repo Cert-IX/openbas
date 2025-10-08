@@ -3,7 +3,7 @@ package io.openaev.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.openaev.IntegrationTest;
-import io.openaev.injectors.opencti.config.OpenCTIConfig;
+import io.openaev.opencti.config.OpenCTIConfig;
 import io.openaev.utils.mockConfig.WithMockOpenCTIConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

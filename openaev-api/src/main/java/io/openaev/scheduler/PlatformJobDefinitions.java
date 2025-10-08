@@ -50,4 +50,12 @@ public class PlatformJobDefinitions {
         .withIdentity(jobKey("SecurityCoverageJob"))
         .build();
   }
+
+  @Bean
+  public JobDetail getConnectorPingJob() {
+    return JobBuilder.newJob(OpenCTIConnectorRegisterPingJob.class)
+        .storeDurably()
+        .withIdentity(jobKey("ConnectorPingJob"))
+        .build();
+  }
 }

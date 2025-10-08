@@ -1,11 +1,10 @@
-package io.openaev.octi;
+package io.openaev.opencti;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.openaev.IntegrationTest;
-import io.openaev.opencti.OpenCTIApi;
 import io.openaev.rest.attack_pattern.AttackPatternApi;
 import io.openaev.rest.inject.InjectApi;
 import io.openaev.rest.inject.ScenarioInjectApi;

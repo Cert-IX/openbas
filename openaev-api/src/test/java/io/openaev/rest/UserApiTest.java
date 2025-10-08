@@ -2,6 +2,7 @@ package io.openaev.rest;
 
 import static io.openaev.utils.JsonUtils.asJsonString;
 import static io.openaev.utils.fixtures.UserFixture.EMAIL;
+import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
 import static org.mockito.ArgumentMatchers.any;
@@ -18,19 +19,23 @@ import io.openaev.database.model.Grant;
 import io.openaev.database.model.Group;
 import io.openaev.database.model.Scenario;
 import io.openaev.database.model.User;
-import io.openaev.database.repository.GrantRepository;
-import io.openaev.database.repository.GroupRepository;
-import io.openaev.database.repository.ScenarioRepository;
-import io.openaev.database.repository.UserRepository;
+import io.openaev.database.repository.*;
 import io.openaev.rest.user.form.login.LoginUserInput;
 import io.openaev.rest.user.form.login.ResetUserInput;
 import io.openaev.rest.user.form.user.CreateUserInput;
 import io.openaev.rest.user.form.user.UpdateUserInput;
 import io.openaev.service.MailingService;
+import io.openaev.utils.fixtures.OrganizationFixture;
 import io.openaev.utils.fixtures.ScenarioFixture;
+import io.openaev.utils.fixtures.TagFixture;
 import io.openaev.utils.fixtures.UserFixture;
+import io.openaev.utils.fixtures.composers.OrganizationComposer;
+import io.openaev.utils.fixtures.composers.TagComposer;
+import io.openaev.utils.fixtures.composers.UserComposer;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import net.javacrumbs.jsonunit.core.Option;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,9 +56,14 @@ class UserApiTest extends IntegrationTest {
 
   @Autowired private ScenarioRepository scenarioRepository;
   @Autowired private GroupRepository groupRepository;
+  @Autowired private OrganizationRepository organizationRepository;
   @Autowired private GrantRepository grantRepository;
+  @Autowired private TagComposer tagComposer;
 
   @MockBean private MailingService mailingService;
+  @Autowired private UserComposer userComposer;
+  @Autowired private OrganizationComposer organisationComposer;
+  @Autowired private TagRepository tagRepository;
 
   @BeforeAll
   public void setup() {
@@ -74,6 +84,8 @@ class UserApiTest extends IntegrationTest {
     this.userRepository.deleteAll();
     this.groupRepository.deleteAll();
     this.grantRepository.deleteAll();
+    this.organizationRepository.deleteAll();
+    tagRepository.deleteAll(this.tagComposer.generatedItems);
   }
 
   @Nested
@@ -171,6 +183,97 @@ class UserApiTest extends IntegrationTest {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(asJsonString(input)))
           .andExpect(status().isConflict());
+    }
+  }
+
+  @Nested
+  @DisplayName("Update the user")
+  @io.openaev.utils.mockUser.WithMockUser(isAdmin = true)
+  public class UpdateTheUser {
+    @Test
+    @DisplayName("Can update the user with an input object")
+    public void canUpdateTheUserWithAnInputObject() throws Exception {
+      UserComposer.Composer userWrapper =
+          userComposer
+              .forUser(UserFixture.getUser("Michel", "Angelo", "m.angelo@sixtine.invalid"))
+              .persist();
+      OrganizationComposer.Composer orgWrapper =
+          organisationComposer
+              .forOrganization(OrganizationFixture.createDefaultOrganisation())
+              .persist();
+      List<TagComposer.Composer> tagWrappers =
+          List.of(
+              tagComposer.forTag(TagFixture.getTagWithText("tag_1")).persist(),
+              tagComposer.forTag(TagFixture.getTagWithText("tag_2")).persist(),
+              tagComposer.forTag(TagFixture.getTagWithText("tag_3")).persist());
+
+      UpdateUserInput updateUserInput = new UpdateUserInput();
+      updateUserInput.setFirstname("New firstname");
+      updateUserInput.setLastname("New lastname");
+      updateUserInput.setEmail("new_email@domain.invalid");
+      updateUserInput.setAdmin(!userWrapper.get().isAdmin());
+      updateUserInput.setOrganizationId(orgWrapper.get().getId());
+      updateUserInput.setPhone("+33123456789");
+      updateUserInput.setPhone2("+33012345678");
+      updateUserInput.setPgpKey("new pgp key");
+      updateUserInput.setTagIds(tagWrappers.stream().map(tw -> tw.get().getId()).toList());
+
+      String response =
+          mvc.perform(
+                  MockMvcRequestBuilders.put("/api/users/" + userWrapper.get().getId())
+                      .contentType(MediaType.APPLICATION_JSON)
+                      .content(asJsonString(updateUserInput)))
+              .andExpect(status().is2xxSuccessful())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+
+      assertThatJson(response)
+          .when(Option.IGNORING_ARRAY_ORDER)
+          .whenIgnoringPaths(
+              "listened", "user_id", "user_created_at", "user_updated_at", "user_gravatar")
+          .isEqualTo(
+              """
+              {
+                "listened":true,
+                "user_id":"bb1d9737-0db0-467a-9daa-ce12deb8b247",
+                "user_firstname":"New firstname",
+                "user_lastname":"New lastname",
+                "user_lang":"auto",
+                "user_theme":"default",
+                "user_email":"new_email@domain.invalid",
+                "user_phone":"+33123456789",
+                "user_phone2":"+33012345678",
+                "user_pgp_key":"new pgp key",
+                "user_status":0,
+                "user_created_at":"2025-10-03T12:05:27.665735Z",
+                "user_updated_at":"2025-10-03T12:05:27.665735Z",
+                "user_organization":"%s",
+                "user_admin":true,
+                "user_country":null,
+                "user_city":null,
+                "user_groups":[],
+                "user_teams":[],
+                "user_tags":[%s],
+                "user_communications":[],
+                "team_exercises_users":[],
+                "user_gravatar":"https://www.gravatar.com/avatar/48446ca219d9501c60a2fa161f24cc75?d=mm",
+                "user_is_planner":true,
+                "user_is_observer":true,
+                "user_is_manager":true,
+                "user_capabilities":[],
+                "user_grants":{},
+                "user_is_player":true,
+                "user_is_external":false,
+                "user_is_only_player":false,
+                "user_is_admin_or_bypass":true
+              }
+              """
+                  .formatted(
+                      orgWrapper.get().getId(),
+                      tagWrappers.stream()
+                          .map(tw -> "\"%s\"".formatted(tw.get().getId()))
+                          .collect(Collectors.joining(","))));
     }
   }
 

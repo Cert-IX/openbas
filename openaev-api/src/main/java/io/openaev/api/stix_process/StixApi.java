@@ -48,7 +48,7 @@ public class StixApi extends RestBehavior {
         description = "Invalid STIX bundle (e.g., too many security coverages)"),
     @ApiResponse(responseCode = "500", description = "Unexpected server error")
   })
-  @RBAC(actionPerformed = Action.CREATE, resourceType = ResourceType.SCENARIO)
+  @RBAC(actionPerformed = Action.PROCESS, resourceType = ResourceType.STIX_BUNDLE)
   public ResponseEntity<?> processBundle(@RequestBody String stixJson) {
     try {
       Scenario scenario = stixService.processBundle(stixJson);

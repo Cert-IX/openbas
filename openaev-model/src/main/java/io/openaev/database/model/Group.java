@@ -3,6 +3,7 @@ package io.openaev.database.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import io.openaev.annotation.ControlledUuidGeneration;
 import io.openaev.annotation.Queryable;
 import io.openaev.database.audit.ModelBaseListener;
 import io.openaev.helper.MultiIdListDeserializer;
@@ -16,7 +17,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.Fetch;
 import org.hibernate.annotations.FetchMode;
-import org.hibernate.annotations.UuidGenerator;
 
 @Setter
 @Getter
@@ -26,9 +26,8 @@ import org.hibernate.annotations.UuidGenerator;
 public class Group implements Base {
 
   @Id
+  @ControlledUuidGeneration
   @Column(name = "group_id")
-  @GeneratedValue(generator = "UUID")
-  @UuidGenerator
   @JsonProperty("group_id")
   @NotBlank
   private String id;

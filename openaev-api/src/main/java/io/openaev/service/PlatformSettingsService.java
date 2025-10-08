@@ -19,7 +19,7 @@ import io.openaev.engine.EngineService;
 import io.openaev.executors.caldera.config.CalderaExecutorConfig;
 import io.openaev.expectation.ExpectationPropertiesConfig;
 import io.openaev.helper.RabbitMQHelper;
-import io.openaev.injectors.opencti.config.OpenCTIConfig;
+import io.openaev.opencti.config.OpenCTIConfig;
 import io.openaev.rest.exception.BadRequestException;
 import io.openaev.rest.settings.PreviewFeature;
 import io.openaev.rest.settings.form.*;

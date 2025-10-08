@@ -1,0 +1,125 @@
+package io.openaev.opencti.service;
+
+import static io.openaev.database.model.ExecutionTrace.getNewErrorTrace;
+import static io.openaev.database.model.ExecutionTrace.getNewSuccessTrace;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.openaev.database.model.*;
+import io.openaev.opencti.client.OpenCTIClient;
+import io.openaev.opencti.client.mutations.*;
+import io.openaev.opencti.client.response.Response;
+import io.openaev.opencti.client.response.fields.Error;
+import io.openaev.opencti.config.OpenCTIConfig;
+import io.openaev.opencti.connectors.ConnectorBase;
+import io.openaev.opencti.connectors.service.PrivilegeService;
+import io.openaev.opencti.errors.ConnectorError;
+import java.io.IOException;
+import java.time.Instant;
+import java.util.List;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.hc.core5.http.HttpStatus;
+import org.springframework.stereotype.Component;
+
+@Component
+@Slf4j
+@RequiredArgsConstructor
+public class OpenCTIService {
+  private final OpenCTIConfig classicOpenCTIConfig;
+  private final OpenCTIClient openCTIClient;
+  private final ObjectMapper mapper;
+  private final PrivilegeService privilegeService;
+
+  public RegisterConnector.ResponsePayload registerConnector(ConnectorBase connector)
+      throws IOException, ConnectorError {
+
+    privilegeService.ensurePrivilegedUserExistsForConnector(connector);
+
+    Response r =
+        openCTIClient.execute(
+            connector.getUrl(), connector.getAuthToken(), new RegisterConnector(connector));
+    if (r.isError()) {
+      throw new ConnectorError(
+          """
+        Failed to register connector %s with OpenCTI at %s
+        Errors: %s
+        """
+              .formatted(
+                  connector.getName(),
+                  connector.getUrl(),
+                  r.getErrors().stream().map(Error::toString).collect(Collectors.joining("\n"))));
+    } else {
+      RegisterConnector.ResponsePayload payload =
+          mapper.convertValue(r.getData(), RegisterConnector.ResponsePayload.class);
+      log.info(
+          "Registered connector {} with OpenCTI at {}", connector.getName(), connector.getUrl());
+      // side effect on transient state
+      connector.setRegistered(true);
+      return payload;
+    }
+  }
+
+  public Ping.ResponsePayload pingConnector(ConnectorBase connector)
+      throws IOException, ConnectorError {
+    if (!connector.isRegistered()) {
+      throw new ConnectorError(
+          "Cannot ping connector %s with OpenCTI at %s: connector hasn't registered yet. Try again later."
+              .formatted(connector.getName(), connector.getUrl()));
+    }
+
+    privilegeService.ensurePrivilegedUserExistsForConnector(connector);
+
+    Response r =
+        openCTIClient.execute(connector.getUrl(), connector.getAuthToken(), new Ping(connector));
+    if (r.isError()) {
+      throw new ConnectorError(
+          """
+        Failed to ping connector %s with OpenCTI at %s
+        Errors: %s
+        """
+              .formatted(
+                  connector.getName(),
+                  connector.getUrl(),
+                  r.getErrors().stream().map(Error::toString).collect(Collectors.joining("\n"))));
+    } else {
+      Ping.ResponsePayload payload = mapper.convertValue(r.getData(), Ping.ResponsePayload.class);
+      log.info("Pinged connector {} with OpenCTI at {}", connector.getName(), connector.getUrl());
+      return payload;
+    }
+  }
+
+  // TODO: support attachments; argument: `List<DataAttachment> attachments`
+  public void createCase(
+      Execution execution, String name, String description, List<DataAttachment> attachments)
+      throws Exception {
+    Mutation mut = new CreateCase(name, description);
+    Response response =
+        openCTIClient.execute(
+            classicOpenCTIConfig.getApiUrl(), classicOpenCTIConfig.getToken(), mut);
+    if (response.getStatus() == HttpStatus.SC_OK) {
+      execution.addTrace(
+          getNewSuccessTrace(
+              "Case created (" + response.getData() + ")", ExecutionTraceAction.COMPLETE));
+    } else {
+      execution.addTrace(getNewErrorTrace("Fail to POST", ExecutionTraceAction.COMPLETE));
+    }
+  }
+
+  // TODO: support attachments; argument: `List<DataAttachment> attachments`
+  public void createReport(
+      Execution execution, String name, String description, List<DataAttachment> attachments)
+      throws IOException {
+    Mutation mut = new CreateReport(name, description, Instant.now());
+    Response response =
+        openCTIClient.execute(
+            classicOpenCTIConfig.getApiUrl(), classicOpenCTIConfig.getToken(), mut);
+    if (response.getStatus() == HttpStatus.SC_OK) {
+      execution.addTrace(
+          getNewSuccessTrace(
+              "Report created (" + response.getData() + ")", ExecutionTraceAction.COMPLETE));
+    } else {
+      execution.addTrace(getNewErrorTrace("Fail to POST", ExecutionTraceAction.COMPLETE));
+    }
+  }
+}
