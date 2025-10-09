@@ -18,6 +18,8 @@ import io.openaev.database.model.*;
 import io.openaev.database.raw.*;
 import io.openaev.database.repository.*;
 import io.openaev.database.specification.*;
+import io.openaev.rest.asset.endpoint.form.EndpointOutput;
+import io.openaev.rest.asset_group.form.AssetGroupOutput;
 import io.openaev.rest.custom_dashboard.CustomDashboardService;
 import io.openaev.rest.document.DocumentService;
 import io.openaev.rest.exception.ElementNotFoundException;
@@ -45,6 +47,7 @@ import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
@@ -891,7 +894,7 @@ public class ExerciseApi extends RestBehavior {
   // endregion
 
   // region asset groups, endpoints, documents and channels
-  @GetMapping(EXERCISE_URI + "/{exerciseId}/asset_groups")
+  @GetMapping(EXERCISE_URI + "/{exerciseId}/asset-groups")
   @RBAC(
       resourceId = "#exerciseId",
       actionPerformed = Action.READ,
@@ -902,6 +905,21 @@ public class ExerciseApi extends RestBehavior {
       description = "Get all asset groups used by injects for a given simulation")
   public List<AssetGroup> assetGroups(@PathVariable String exerciseId) {
     return this.assetGroupService.assetGroupsForSimulation(exerciseId);
+  }
+
+  @PostMapping(EXERCISE_URI + "/{exerciseId}/asset-groups/find")
+  @RBAC(
+      resourceId = "#exerciseId",
+      actionPerformed = Action.READ,
+      resourceType = ResourceType.SIMULATION)
+  @Operation(
+      summary =
+          "Get asset groups by ids. Can only be called if the user has access to the given simulation.",
+      description = "Get all asset groups by ids used by injects for a given simulation")
+  public List<AssetGroupOutput> assetGroupsByIds(
+      @PathVariable String exerciseId,
+      @RequestBody @Valid @NotNull final List<String> assetGroupIds) {
+    return this.assetGroupService.assetGroupsByIdsForSimulation(exerciseId, assetGroupIds);
   }
 
   @GetMapping(EXERCISE_URI + "/{exerciseId}/channels")
@@ -926,6 +944,21 @@ public class ExerciseApi extends RestBehavior {
       description = "Get all endpoints used by injects for a given simulation")
   public List<Endpoint> endpoints(@PathVariable String exerciseId) {
     return this.endpointService.endpointsForSimulation(exerciseId);
+  }
+
+  @PostMapping(EXERCISE_URI + "/{exerciseId}/endpoints/find")
+  @RBAC(
+      resourceId = "#exerciseId",
+      actionPerformed = Action.READ,
+      resourceType = ResourceType.SIMULATION)
+  @Operation(
+      summary =
+          "Get endpoints by ids. Can only be called if the user has access to the given simulation.",
+      description = "Get all endpoints by ids used by injects for a given simulation")
+  public List<EndpointOutput> endpointsByIds(
+      @PathVariable String exerciseId,
+      @RequestBody @Valid @NotNull final List<String> endpointIds) {
+    return this.endpointService.endpointsByIdsForSimulation(exerciseId, endpointIds);
   }
 
   @GetMapping(EXERCISE_URI + "/{exerciseId}/documents")

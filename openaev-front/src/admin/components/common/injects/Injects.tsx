@@ -21,7 +21,7 @@ import ItemTags from '../../../../components/ItemTags';
 import Loader from '../../../../components/Loader';
 import PaginatedListLoader from '../../../../components/PaginatedListLoader';
 import PlatformIcon from '../../../../components/PlatformIcon';
-import { type Article, type AssetGroup, type Inject, type InjectBulkUpdateOperation, type InjectExportFromSearchRequestInput, type InjectInput, type InjectTestStatusOutput, type SearchPaginationInput, type Team, type Variable } from '../../../../utils/api-types';
+import { type Article, type Inject, type InjectBulkUpdateOperation, type InjectExportFromSearchRequestInput, type InjectInput, type InjectTestStatusOutput, type SearchPaginationInput, type Team, type Variable } from '../../../../utils/api-types';
 import { type InjectorContractConverted } from '../../../../utils/api-types-custom';
 import { MESSAGING$ } from '../../../../utils/Environment';
 import useEntityToggle from '../../../../utils/hooks/useEntityToggle';
@@ -82,7 +82,6 @@ interface Props {
   articles: Article[];
   variables: Variable[];
   uriVariable: string;
-  assetGroups: AssetGroup[];
 }
 
 const Injects: FunctionComponent<Props> = ({
@@ -92,7 +91,6 @@ const Injects: FunctionComponent<Props> = ({
   articles,
   variables,
   uriVariable,
-  assetGroups,
 }) => {
   // Standard hooks
   const { classes } = useStyles();
@@ -668,7 +666,6 @@ const Injects: FunctionComponent<Props> = ({
                 selectAll={selectAll}
                 handleClearSelectedElements={handleClearSelectedElements}
                 teamsFromExerciseOrScenario={teams}
-                assetGroups={assetGroups}
                 id={contextId}
                 handleUpdate={massUpdateInjects}
                 handleBulkDelete={bulkDeleteInjects}

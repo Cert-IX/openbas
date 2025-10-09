@@ -10,7 +10,9 @@ import io.openaev.database.model.*;
 import io.openaev.database.raw.RawAssetGroup;
 import io.openaev.database.repository.AssetGroupRepository;
 import io.openaev.database.specification.EndpointSpecification;
+import io.openaev.rest.asset_group.form.AssetGroupOutput;
 import io.openaev.utils.FilterUtilsJpa;
+import io.openaev.utils.mapper.AssetGroupMapper;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.*;
@@ -32,6 +34,7 @@ public class AssetGroupService {
   private final AssetService assetService;
   private final EndpointService endpointService;
   private final TagRuleService tagRuleService;
+  private final AssetGroupMapper assetGroupMapper;
 
   // -- ASSET GROUP --
 
@@ -57,10 +60,32 @@ public class AssetGroupService {
     return computeDynamicAssets(assetGroups);
   }
 
+  public List<AssetGroupOutput> assetGroupsByIdsForSimulation(
+      @NotBlank final String simulationId, List<String> assetGroupIds) {
+    List<AssetGroup> assetGroups =
+        fromIterable(
+            this.assetGroupRepository.findDistinctByInjectsSimulationIdAndIdIn(
+                simulationId, assetGroupIds));
+    return computeDynamicAssets(assetGroups).stream()
+        .map(assetGroupMapper::toAssetGroupOutput)
+        .toList();
+  }
+
   public List<AssetGroup> assetGroupsForScenario(@NotBlank final String scenarioId) {
     List<AssetGroup> assetGroups =
         fromIterable(this.assetGroupRepository.findDistinctByInjectsScenarioId(scenarioId));
     return computeDynamicAssets(assetGroups);
+  }
+
+  public List<AssetGroupOutput> assetGroupsByIdsForScenario(
+      @NotBlank final String scenarioId, List<String> assetGroupIds) {
+    List<AssetGroup> assetGroups =
+        fromIterable(
+            this.assetGroupRepository.findDistinctByInjectsScenarioIdAndIdIn(
+                scenarioId, assetGroupIds));
+    return computeDynamicAssets(assetGroups).stream()
+        .map(assetGroupMapper::toAssetGroupOutput)
+        .toList();
   }
 
   public AssetGroup assetGroup(@NotBlank final String assetGroupId) {
