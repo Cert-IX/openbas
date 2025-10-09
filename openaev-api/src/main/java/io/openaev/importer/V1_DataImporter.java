@@ -22,6 +22,7 @@ import io.openaev.injectors.challenge.model.ChallengeContent;
 import io.openaev.injectors.channel.model.ChannelContent;
 import io.openaev.rest.exercise.exports.VariableWithValueMixin;
 import io.openaev.rest.inject.form.InjectDependencyInput;
+import io.openaev.rest.injector_contract.InjectorContractContentUtils;
 import io.openaev.rest.payload.contract_output_element.ContractOutputElementInput;
 import io.openaev.rest.payload.form.*;
 import io.openaev.rest.payload.output_parser.OutputParserInput;
@@ -42,7 +43,6 @@ import java.util.stream.StreamSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,7 +76,9 @@ public class V1_DataImporter implements Importer {
   private final VariableRepository variableRepository;
   private final InjectDependenciesRepository injectDependenciesRepository;
   private final PayloadCreationService payloadCreationService;
-  @Autowired private CollectorRepository collectorRepository;
+  private final CollectorRepository collectorRepository;
+
+  private final InjectorContractContentUtils injectorContractContentUtils;
 
   // endregion
 
@@ -145,6 +147,8 @@ public class V1_DataImporter implements Importer {
       Map<String, ImportEntry> docReferences,
       Exercise exercise,
       Scenario scenario,
+      Asset asset,
+      AssetGroup assetGroup,
       String suffix,
       boolean isFromStarterPack) {
     Map<String, Base> baseIds = new HashMap<>();
@@ -179,7 +183,7 @@ public class V1_DataImporter implements Importer {
     importArticles(importNode, prefix, savedExercise, savedScenario, baseIds);
     importObjectives(importNode, prefix, savedExercise, savedScenario, baseIds);
     importLessons(importNode, prefix, savedExercise, savedScenario, baseIds);
-    importInjects(importNode, prefix, savedExercise, savedScenario, baseIds);
+    importInjects(importNode, prefix, savedExercise, savedScenario, asset, assetGroup, baseIds);
     importVariables(importNode, savedExercise, savedScenario, baseIds);
   }
 
@@ -926,6 +930,8 @@ public class V1_DataImporter implements Importer {
       String prefix,
       Exercise savedExercise,
       Scenario savedScenario,
+      Asset asset,
+      AssetGroup assetGroup,
       Map<String, Base> baseIds) {
     Supplier<Stream<JsonNode>> injectsStream =
         () ->
@@ -968,6 +974,8 @@ public class V1_DataImporter implements Importer {
         baseIds,
         savedExercise,
         savedScenario,
+        asset,
+        assetGroup,
         injectsNoParent.toList(),
         injectsStream.get().toList());
   }
@@ -976,6 +984,8 @@ public class V1_DataImporter implements Importer {
       Map<String, Base> baseIds,
       Exercise exercise,
       Scenario scenario,
+      Asset asset,
+      AssetGroup assetGroup,
       List<JsonNode> injectsToAdd,
       List<JsonNode> allInjects) {
     List<String> originalIds = new ArrayList<>();
@@ -1020,11 +1030,13 @@ public class V1_DataImporter implements Importer {
                 } else {
                   log.info(
                       "Inject comes from a collector not set up in your environment, a new payload has been created.");
-                  injectorContractId = importPayload(payloadNode, baseIds);
+                  injectorContract = importPayload(payloadNode, baseIds);
+                  injectorContractId = injectorContract.map(InjectorContract::getId).orElse(null);
                 }
                 // Create new payload
               } else {
-                injectorContractId = importPayload(payloadNode, baseIds);
+                injectorContract = importPayload(payloadNode, baseIds);
+                injectorContractId = injectorContract.map(InjectorContract::getId).orElse(null);
               }
             }
           } else {
@@ -1143,6 +1155,20 @@ public class V1_DataImporter implements Importer {
                   log.warn("Missing document in the exercise_documents property");
                 }
               });
+
+          // Define default AssetsGroup or Assets
+          Optional<Inject> injectOpt = injectRepository.findById(injectId);
+          if (injectorContract.isPresent() && injectOpt.isPresent()) {
+            Inject inject = injectOpt.get();
+            if (assetGroup != null
+                && injectorContractContentUtils.hasField(injectorContract.get(), "asset_groups")) {
+              inject.getAssetGroups().add(assetGroup);
+            } else if (asset != null
+                && injectorContractContentUtils.hasField(injectorContract.get(), "assets")) {
+              inject.getAssets().add(asset);
+            }
+            injectRepository.save(inject);
+          }
         });
     // Looking for children of created injects
     List<JsonNode> childInjects =
@@ -1168,7 +1194,7 @@ public class V1_DataImporter implements Importer {
                 })
             .toList();
     if (!childInjects.isEmpty()) {
-      importInjects(baseIds, exercise, scenario, childInjects, allInjects);
+      importInjects(baseIds, exercise, scenario, asset, assetGroup, childInjects, allInjects);
     }
   }
 
@@ -1289,7 +1315,8 @@ public class V1_DataImporter implements Importer {
     }
   }
 
-  private String importPayload(@NotNull final JsonNode payloadNode, Map<String, Base> baseIds) {
+  private Optional<InjectorContract> importPayload(
+      @NotNull final JsonNode payloadNode, Map<String, Base> baseIds) {
     // swap executable file id or file drop file id
     if (payloadNode.has("executable_file")) {
       ((ObjectNode) payloadNode)
@@ -1321,10 +1348,10 @@ public class V1_DataImporter implements Importer {
         this.injectorContractRepository.findOne(byPayloadId(payload.getId()));
 
     if (injectorContractFromPayload.isPresent()) {
-      return injectorContractFromPayload.get().getId();
+      return injectorContractFromPayload;
     } else {
       log.warn("An error has occurred when importing the payload: {}", payload.getName());
-      return null;
+      return Optional.empty();
     }
   }
 
