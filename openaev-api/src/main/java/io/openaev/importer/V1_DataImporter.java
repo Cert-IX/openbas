@@ -11,6 +11,7 @@ import static io.openaev.rest.scenario.export.ScenarioFileExport.SCENARIO_VARIAB
 import static java.util.Optional.ofNullable;
 import static org.springframework.util.StringUtils.hasText;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -30,6 +31,7 @@ import io.openaev.rest.payload.regex_group.RegexGroupInput;
 import io.openaev.rest.payload.service.PayloadCreationService;
 import io.openaev.service.FileService;
 import io.openaev.service.ImportEntry;
+import io.openaev.service.InjectorService;
 import io.openaev.service.ScenarioService;
 import io.openaev.telemetry.metric_collectors.ActionMetricCollector;
 import jakarta.activation.MimetypesFileTypeMap;
@@ -43,6 +45,7 @@ import java.util.stream.StreamSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,6 +82,9 @@ public class V1_DataImporter implements Importer {
   private final CollectorRepository collectorRepository;
 
   private final InjectorContractContentUtils injectorContractContentUtils;
+
+  @Qualifier("coreInjectorService")
+  private final InjectorService injectorService;
 
   // endregion
 
@@ -183,7 +189,15 @@ public class V1_DataImporter implements Importer {
     importArticles(importNode, prefix, savedExercise, savedScenario, baseIds);
     importObjectives(importNode, prefix, savedExercise, savedScenario, baseIds);
     importLessons(importNode, prefix, savedExercise, savedScenario, baseIds);
-    importInjects(importNode, prefix, savedExercise, savedScenario, asset, assetGroup, baseIds);
+    importInjects(
+        importNode,
+        prefix,
+        savedExercise,
+        savedScenario,
+        asset,
+        assetGroup,
+        baseIds,
+        isFromStarterPack);
     importVariables(importNode, savedExercise, savedScenario, baseIds);
   }
 
@@ -932,7 +946,8 @@ public class V1_DataImporter implements Importer {
       Scenario savedScenario,
       Asset asset,
       AssetGroup assetGroup,
-      Map<String, Base> baseIds) {
+      Map<String, Base> baseIds,
+      boolean isFromStarterPack) {
     Supplier<Stream<JsonNode>> injectsStream =
         () ->
             importNode.has(prefix + "injects")
@@ -977,7 +992,8 @@ public class V1_DataImporter implements Importer {
         asset,
         assetGroup,
         injectsNoParent.toList(),
-        injectsStream.get().toList());
+        injectsStream.get().toList(),
+        isFromStarterPack);
   }
 
   private void importInjects(
@@ -987,7 +1003,8 @@ public class V1_DataImporter implements Importer {
       Asset asset,
       AssetGroup assetGroup,
       List<JsonNode> injectsToAdd,
-      List<JsonNode> allInjects) {
+      List<JsonNode> allInjects,
+      boolean isFromStarterPack) {
     List<String> originalIds = new ArrayList<>();
     injectsToAdd.forEach(
         injectNode -> {
@@ -1044,9 +1061,17 @@ public class V1_DataImporter implements Importer {
           }
 
           if (injectorContractId == null) {
-            log.warn(
-                "Import Inject Failed: Unresolved injector contract ID on inject: {}", injectId);
-            return;
+            if (isFromStarterPack) {
+              // if the we are importing starter pack, we will create the injector contract so the
+              // injects are created before the injector registered
+              // once the injector register the contract will be overriden and will be the one
+              // provided by the injector
+              injectorContractId =
+                  importInjectorContractFromStarterPack(injectContractNode).getId();
+            } else {
+              log.warn(
+                  "Import Inject Failed: Unresolved injector contract ID on inject: {}", injectId);
+            }
           }
 
           // If contract is not know, inject can't be imported
@@ -1158,13 +1183,15 @@ public class V1_DataImporter implements Importer {
 
           // Define default AssetsGroup or Assets
           Optional<Inject> injectOpt = injectRepository.findById(injectId);
-          if (injectorContract.isPresent() && injectOpt.isPresent()) {
+          if (injectOpt.isPresent() && injectOpt.get().getInjectorContract().isPresent()) {
             Inject inject = injectOpt.get();
             if (assetGroup != null
-                && injectorContractContentUtils.hasField(injectorContract.get(), "asset_groups")) {
+                && injectorContractContentUtils.hasField(
+                    inject.getInjectorContract().get(), "asset_groups")) {
               inject.getAssetGroups().add(assetGroup);
             } else if (asset != null
-                && injectorContractContentUtils.hasField(injectorContract.get(), "assets")) {
+                && injectorContractContentUtils.hasField(
+                    inject.getInjectorContract().get(), "assets")) {
               inject.getAssets().add(asset);
             }
             injectRepository.save(inject);
@@ -1194,8 +1221,51 @@ public class V1_DataImporter implements Importer {
                 })
             .toList();
     if (!childInjects.isEmpty()) {
-      importInjects(baseIds, exercise, scenario, asset, assetGroup, childInjects, allInjects);
+      importInjects(
+          baseIds,
+          exercise,
+          scenario,
+          asset,
+          assetGroup,
+          childInjects,
+          allInjects,
+          isFromStarterPack);
     }
+  }
+
+  /**
+   * Used to create a dummy injector to be able to import injector contract from the starterpack
+   * before the real contract is created by the real injector
+   *
+   * @param importNode contract node
+   * @return
+   */
+  private Injector createDummyInjector(JsonNode importNode) {
+
+    return injectorService.createDummyInjector(
+        importNode.get("injector_contract_injector_type").asText(),
+        importNode.get("injector_contract_injector_type_name").asText());
+  }
+
+  /**
+   * Import injector contract from the starterpack before the real contract is created by the real
+   * injector, this contract will be overriden
+   *
+   * @param importNode contract node
+   * @return
+   */
+  private InjectorContract importInjectorContractFromStarterPack(JsonNode importNode) {
+    InjectorContract injectorContract = new InjectorContract();
+    injectorContract.setId(importNode.get("injector_contract_id").textValue());
+    injectorContract.setCustom(false);
+    injectorContract.setContent(importNode.get("injector_contract_content").textValue());
+    injectorContract.setInjector(createDummyInjector(importNode));
+    injectorContract.setConvertedContent((ObjectNode) importNode.get("convertedContent"));
+    injectorContract.setExternalId(importNode.get("injector_contract_external_id").textValue());
+    injectorContract.setLabels(
+        new ObjectMapper()
+            .convertValue(importNode.get("injector_contract_labels"), new TypeReference<>() {}));
+    return injectorContractRepository.save(injectorContract);
   }
 
   public static ContractOutputType formatStringToContractOutputType(String value) {
