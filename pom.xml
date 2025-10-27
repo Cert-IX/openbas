@@ -9,13 +9,13 @@
         <version>3.3.7</version>
     </parent>
 
-    <groupId>io.openbas</groupId>
-    <artifactId>openbas-platform</artifactId>
+    <groupId>io.openaev</groupId>
+    <artifactId>openaev-platform</artifactId>
     <version>1.18.20</version>
     <packaging>pom</packaging>
 
-    <name>OpenBAS platform</name>
-    <description>OpenBAS platform</description>
+    <name>OpenAEV platform</name>
+    <description>OpenAEV platform</description>
 
     <properties>
         <java.version>21</java.version>
@@ -23,12 +23,12 @@
 
         <minio.version>8.5.17</minio.version>
         <validation-api.version>2.0.1.Final</validation-api.version>
-        <commons-io.version>2.19.0</commons-io.version>
-        <commons-validator.version>1.9.0</commons-validator.version>
+        <commons-io.version>2.20.0</commons-io.version>
+        <commons-validator.version>1.10.0</commons-validator.version>
         <maven-compiler-plugin.version>3.14.0</maven-compiler-plugin.version>
         <jacoco-plugin.version>0.8.13</jacoco-plugin.version>
         <pyroscope.version>2.1.2</pyroscope.version>
-        <spring-security-crypto.version>6.5.1</spring-security-crypto.version>
+        <spring-security-crypto.version>6.5.2</spring-security-crypto.version>
     </properties>
 
     <distributionManagement>
@@ -113,7 +113,7 @@
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
-                <version>2.44.5</version>
+                <version>2.46.1</version>
                 <configuration>
                     <java>
                         <includes>
@@ -133,8 +133,8 @@
     </build>
 
     <modules>
-        <module>openbas-model</module>
-        <module>openbas-framework</module>
-        <module>openbas-api</module>
+        <module>openaev-model</module>
+        <module>openaev-framework</module>
+        <module>openaev-api</module>
     </modules>
 </project>
