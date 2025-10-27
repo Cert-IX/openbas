@@ -1,6 +1,5 @@
 package io.openaev.utils.fixtures;
 
-import io.openaev.cron.ScheduleFrequency;
 import io.openaev.database.model.AttackPattern;
 import io.openaev.database.model.SecurityCoverage;
 import io.openaev.database.model.StixRefToExternalRef;
@@ -14,11 +13,11 @@ import java.util.stream.Collectors;
 public class SecurityCoverageFixture {
   public static SecurityCoverage createDefaultSecurityCoverage() {
     SecurityCoverage securityCoverage = new SecurityCoverage();
-    securityCoverage.setName("Security assessment for tests");
-    securityCoverage.setExternalId("x-security-assessment--%s".formatted(UUID.randomUUID()));
-    securityCoverage.setScheduling(ScheduleFrequency.DAILY);
+    securityCoverage.setName("Security coverage for tests");
+    securityCoverage.setExternalId("security-coverage--%s".formatted(UUID.randomUUID()));
+    securityCoverage.setScheduling("PT1H");
     securityCoverage.setContent(
-        "{\"type\": \"x-security-assessment\", \"id\": \"%s\"}"
+        "{\"type\": \"security-coverage\", \"id\": \"%s\"}"
             .formatted(securityCoverage.getExternalId()));
     securityCoverage.setAttackPatternRefs(new HashSet<>());
     securityCoverage.setVulnerabilitiesRefs(new HashSet<>());

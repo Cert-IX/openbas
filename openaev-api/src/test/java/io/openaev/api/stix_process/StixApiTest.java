@@ -4,7 +4,7 @@ import static io.openaev.api.stix_process.StixApi.STIX_URI;
 import static io.openaev.injector_contract.InjectorContractContentUtilsTest.createContentWithFieldAsset;
 import static io.openaev.injector_contract.InjectorContractContentUtilsTest.createContentWithFieldAssetGroup;
 import static io.openaev.rest.scenario.ScenarioApi.SCENARIO_URI;
-import static io.openaev.service.TagRuleService.OPENCTI_TAG_NAME;
+import static io.openaev.rest.tag.TagService.OPENCTI_TAG_NAME;
 import static io.openaev.utils.fixtures.VulnerabilityFixture.CVE_2023_48788;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -12,7 +12,9 @@ import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.jayway.jsonpath.JsonPath;
 import io.openaev.IntegrationTest;
 import io.openaev.database.model.*;
@@ -27,6 +29,7 @@ import jakarta.annotation.Resource;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -76,27 +79,24 @@ class StixApiTest extends IntegrationTest {
   @BeforeEach
   void setUp() throws Exception {
     attackPatternComposer.reset();
-    try (FileInputStream complete =
-            new FileInputStream("src/test/resources/stix-bundles/security-coverage.json");
-        FileInputStream withoutAttacks =
-            new FileInputStream(
-                "src/test/resources/stix-bundles/security-coverage-without-ttps.json");
-        FileInputStream withoutVulns =
-            new FileInputStream(
-                "src/test/resources/stix-bundles/security-coverage-without-vulns.json");
-        FileInputStream withoutObjects =
-            new FileInputStream(
-                "src/test/resources/stix-bundles/security-coverage-without-objects.json");
-        FileInputStream onlyVulns =
-            new FileInputStream(
-                "src/test/resources/stix-bundles/security-coverage-only-vulns.json")) {
+    stixSecurityCoverage =
+        loadJsonWithStixObjectsAsText("src/test/resources/stix-bundles/security-coverage.json");
 
-      stixSecurityCoverage = IOUtils.toString(complete, StandardCharsets.UTF_8);
-      stixSecurityCoverageWithoutTtps = IOUtils.toString(withoutAttacks, StandardCharsets.UTF_8);
-      stixSecurityCoverageWithoutVulns = IOUtils.toString(withoutVulns, StandardCharsets.UTF_8);
-      stixSecurityCoverageWithoutObjects = IOUtils.toString(withoutObjects, StandardCharsets.UTF_8);
-      stixSecurityCoverageOnlyVulns = IOUtils.toString(onlyVulns, StandardCharsets.UTF_8);
-    }
+    stixSecurityCoverageWithoutTtps =
+        loadJsonWithStixObjectsAsText(
+            "src/test/resources/stix-bundles/security-coverage-without-ttps.json");
+
+    stixSecurityCoverageWithoutVulns =
+        loadJsonWithStixObjectsAsText(
+            "src/test/resources/stix-bundles/security-coverage-without-vulns.json");
+
+    stixSecurityCoverageWithoutObjects =
+        loadJsonWithStixObjectsAsText(
+            "src/test/resources/stix-bundles/security-coverage-without-objects.json");
+
+    stixSecurityCoverageOnlyVulns =
+        loadJsonWithStixObjectsAsText(
+            "src/test/resources/stix-bundles/security-coverage-only-vulns.json");
 
     attackPatternComposer
         .forAttackPattern(AttackPatternFixture.createAttackPatternsWithExternalId(T_1531))
@@ -184,7 +184,7 @@ class StixApiTest extends IntegrationTest {
     @DisplayName("Should return 400 when STIX bundle has no security coverage")
     void shouldReturnBadRequestWhenNoSecurityCoverage() throws Exception {
       String bundleWithoutCoverage =
-          stixSecurityCoverage.replace("x-security-coverage", "x-other-type");
+          stixSecurityCoverage.replace("security-coverage", "x-other-type");
 
       mvc.perform(
               post(STIX_URI + "/process-bundle")
@@ -261,7 +261,7 @@ class StixApiTest extends IntegrationTest {
       assertThat(createdScenario.getDescription())
           .isEqualTo("Security coverage test plan for threat context XYZ.");
       assertThat(createdScenario.getSecurityCoverage().getExternalId())
-          .isEqualTo("x-security-coverage--4c3b91e2-3b47-4f84-b2e6-d27e3f0581c1");
+          .isEqualTo("security-coverage--4c3b91e2-3b47-4f84-b2e6-d27e3f0581c1");
       assertThat(createdScenario.getRecurrence()).isEqualTo("0 0 14 * * *");
       assertThat(createdScenario.getTags().stream().map(tag -> tag.getName()).toList())
           .contains(OPENCTI_TAG_NAME);
@@ -745,5 +745,21 @@ class StixApiTest extends IntegrationTest {
 
       assertThat(duplicatedScenario.getSecurityCoverage()).isNull();
     }
+  }
+
+  private String loadJsonWithStixObjectsAsText(String filePath) throws IOException {
+    String rawJson = IOUtils.toString(new FileInputStream(filePath), StandardCharsets.UTF_8);
+    JsonNode rootNode = mapper.readTree(rawJson);
+
+    JsonNode eventNode = rootNode.get("event");
+    if (eventNode != null && eventNode.has("stix_objects")) {
+      JsonNode stixObjectsNode = eventNode.get("stix_objects");
+
+      if (!stixObjectsNode.isTextual()) {
+        ((ObjectNode) eventNode).put("stix_objects", mapper.writeValueAsString(stixObjectsNode));
+      }
+    }
+
+    return mapper.writeValueAsString(rootNode);
   }
 }
