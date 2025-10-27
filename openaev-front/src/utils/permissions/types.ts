@@ -1,0 +1,36 @@
+export const ACTIONS = {
+  ACCESS: 'ACCESS',
+  MANAGE: 'MANAGE',
+  LAUNCH: 'LAUNCH',
+  DELETE: 'DELETE',
+  SEARCH: 'SEARCH',
+  CREATE: 'CREATE',
+} as const;
+
+export type Actions = typeof ACTIONS[keyof typeof ACTIONS];
+
+export const SUBJECTS = {
+  ASSESSMENT: 'ASSESSMENT', // Scenarios, Simulations and Atomic Testings
+  TEAMS_AND_PLAYERS: 'TEAMS_AND_PLAYERS',
+  ASSETS: 'ASSETS',
+  PAYLOADS: 'PAYLOADS',
+  DASHBOARDS: 'DASHBOARDS',
+  FINDINGS: 'FINDINGS',
+  DOCUMENTS: 'DOCUMENTS',
+  CHANNELS: 'CHANNELS',
+  CHALLENGES: 'CHALLENGES',
+  LESSONS_LEARNED: 'LESSONS_LEARNED',
+  SECURITY_PLATFORMS: 'SECURITY_PLATFORMS',
+  PLATFORM_SETTINGS: 'PLATFORM_SETTINGS',
+  RESOURCE: 'RESOURCE',
+} as const;
+
+export type Subjects = typeof SUBJECTS[keyof typeof SUBJECTS];
+
+export const INHERITED_CONTEXT = {
+  SCENARIO: 'SCENARIO',
+  SIMULATION: 'SIMULATION',
+  NONE: 'NONE',
+} as const;
+
+export type InheritedContext = typeof INHERITED_CONTEXT[keyof typeof INHERITED_CONTEXT];
