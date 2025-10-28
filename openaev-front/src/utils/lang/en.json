@@ -1299,6 +1299,7 @@
   "Phase short name": "Phase short name",
   "Phone number (landline)": "Phone number (landline)",
   "Phone number (mobile)": "Phone number (mobile)",
+  "Phone number must start with + and contain only digits": "Phone number must start with + and contain only digits",
   "phone_number_tooltip": "Phone number should start with a plus sign ( + ). It may contain white spaces or hyphens ( – ) or parenthesis.",
   "Pipe": "Pipe",
   "Planning": "Planning",
