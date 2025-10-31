@@ -44,7 +44,7 @@ public class HomeApi {
             : this.contextPath;
     String newIndex =
         index
-            .replaceAll("%APP_TITLE%", "OpenAEV - Open Adversary Exposure Validation Platform")
+            .replaceAll("%APP_TITLE%", "OpenAEV - Open Adversarial Exposure Validation Platform")
             .replaceAll(
                 "%APP_DESCRIPTION%",
                 "OpenAEV is an open source platform allowing organizations to plan, schedule and conduct adversary simulation campaigns and cyber crisis exercises.")
