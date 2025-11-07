@@ -1,11 +1,14 @@
 package io.openaev.service;
 
+import io.openaev.aop.RBACAspect;
 import io.openaev.database.model.*;
 import io.openaev.rest.exception.ElementNotFoundException;
 import io.openaev.rest.inject.service.InjectService;
 import io.openaev.rest.injector_contract.InjectorContractService;
 import jakarta.validation.constraints.NotNull;
+import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -52,7 +55,11 @@ public class PermissionService {
 
   @Transactional
   public boolean hasPermission(
-      @NotNull final User user, String resourceId, ResourceType resourceType, Action action) {
+      @NotNull final User user,
+      Optional<RBACAspect.HttpMappingInfo> httpMappingInfo,
+      String resourceId,
+      ResourceType resourceType,
+      Action action) {
 
     Set<Capability> userCapabilities = user.getCapabilities();
 
@@ -96,6 +103,23 @@ public class PermissionService {
     // if the user doesn't have the capa check if the user has a grant
     if (RESOURCES_MANAGED_BY_GRANTS.contains(resourceType)) {
       return hasGrantPermission(user, resourceId, resourceType, action);
+    }
+
+    // Specific case: /options endpoints are used to filter tables.
+    // In the context of a grantable resource, they  should be accessible if the sourceId associated
+    // with the request is a resource on which the user is granted
+    if (httpMappingInfo.isEmpty()) {
+      return false;
+    }
+    RBACAspect.HttpMappingInfo mappingInfo = httpMappingInfo.get();
+    boolean endsWithOptions =
+        Arrays.stream(mappingInfo.paths()).anyMatch(path -> path.endsWith("/options"));
+    if (endsWithOptions) {
+      // Retrieve the request param to check if a source ID is provided
+      if (mappingInfo.args().containsKey("sourceId")) {
+        String sourceId = mappingInfo.args().get("sourceId").toString();
+        return hasGrantPermission(user, sourceId, resourceType, action);
+      }
     }
     return false;
   }
