@@ -159,7 +159,7 @@ const PayloadForm = ({
   const {
     handleSubmit,
     control,
-    formState: { errors, isDirty, isSubmitting, defaultValues, dirtyFields },
+    formState: { isDirty, isSubmitting, defaultValues, dirtyFields },
   } = methods;
 
   const getTabForField = (fieldName: string): string | undefined => {
@@ -202,8 +202,9 @@ const PayloadForm = ({
     e.preventDefault();
     const isValid = await methods.trigger();
     if (!isValid) {
-      const firstErrorField = Object.keys(errors)[0];
+      const firstErrorField = Object.keys(methods.formState.errors)[0];
       const tabName = getTabForField(firstErrorField);
+
       if (tabName) handleChangeTab(tabName);
     } else {
       handleSubmit(onSubmit)(e);
