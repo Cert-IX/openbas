@@ -16,15 +16,15 @@ import static java.time.Instant.now;
 import static java.util.Optional.ofNullable;
 import static org.springframework.util.StringUtils.hasText;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import io.openaev.config.OpenAEVConfig;
 import io.openaev.config.cache.LicenseCacheManager;
 import io.openaev.database.model.*;
-import io.openaev.database.raw.RawExerciseSimple;
-import io.openaev.database.raw.RawPaginationScenario;
-import io.openaev.database.raw.RawScenario;
+import io.openaev.database.raw.*;
 import io.openaev.database.repository.*;
 import io.openaev.database.specification.ScenarioSpecification;
 import io.openaev.ee.Ee;
@@ -39,8 +39,11 @@ import io.openaev.rest.exercise.exports.VariableWithValueMixin;
 import io.openaev.rest.exercise.form.ExerciseSimple;
 import io.openaev.rest.inject.service.InjectDuplicateService;
 import io.openaev.rest.inject.service.InjectService;
+import io.openaev.rest.kill_chain_phase.response.KillChainPhaseOutput;
 import io.openaev.rest.scenario.export.ScenarioFileExport;
 import io.openaev.rest.scenario.form.ScenarioSimple;
+import io.openaev.rest.scenario.response.ScenarioOutput;
+import io.openaev.rest.scenario.response.ScenarioTeamUserOutput;
 import io.openaev.rest.team.output.TeamOutput;
 import io.openaev.telemetry.metric_collectors.ActionMetricCollector;
 import io.openaev.utils.TargetType;
@@ -146,7 +149,7 @@ public class ScenarioService {
   }
 
   public List<ScenarioSimple> scenarios() {
-    List<RawScenario> scenarios;
+    List<RawScenarioSimple> scenarios;
     User currentUser = userService.currentUser();
     if (currentUser.isAdminOrBypass()
         || currentUser.getCapabilities().contains(Capability.ACCESS_ASSESSMENT)) {
@@ -158,7 +161,7 @@ public class ScenarioService {
   }
 
   public List<ScenarioSimple> scenarios(final List<String> scenarioIds) {
-    List<RawScenario> scenarios;
+    List<RawScenarioSimple> scenarios;
     User currentUser = userService.currentUser();
     if (currentUser.isAdminOrBypass()
         || currentUser.getCapabilities().contains(Capability.ACCESS_ASSESSMENT)) {
@@ -325,6 +328,31 @@ public class ScenarioService {
     return this.scenarioRepository
         .findById(scenarioId)
         .orElseThrow(() -> new ElementNotFoundException("Scenario not found"));
+  }
+
+  public ScenarioOutput getScenarioById(@NotBlank final String scenarioId) {
+    ObjectMapper objectMapper = new ObjectMapper();
+    RawScenario rawScenario = this.scenarioRepository.getScenarioById(scenarioId);
+    Set<KillChainPhaseOutput> killChainPhases = new HashSet<>();
+    if (rawScenario.getScenario_kill_chain_phases() != null) {
+      try {
+        killChainPhases =
+            objectMapper.readValue(
+                rawScenario.getScenario_kill_chain_phases(), new TypeReference<>() {});
+      } catch (JsonProcessingException e) {
+        log.error("Error reading killChainPhases from scenario id {}", scenarioId, e);
+      }
+    }
+    Set<ScenarioTeamUserOutput> scenarioTeamUsers = new HashSet<>();
+    if (rawScenario.getScenario_teams_users() != null) {
+      try {
+        scenarioTeamUsers =
+            objectMapper.readValue(rawScenario.getScenario_teams_users(), new TypeReference<>() {});
+      } catch (JsonProcessingException e) {
+        log.error("Error reading scenarioTeamUsers from scenario id {}", scenarioId, e);
+      }
+    }
+    return scenarioMapper.toScenarioOutput(rawScenario, killChainPhases, scenarioTeamUsers);
   }
 
   public Scenario scenarioFromSimulationId(@NotBlank final String simulationId) {
