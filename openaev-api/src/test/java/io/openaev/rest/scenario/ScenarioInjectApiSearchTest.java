@@ -1,12 +1,12 @@
 package io.openaev.rest.scenario;
 
 import static io.openaev.database.model.Filters.FilterOperator.contains;
-import static io.openaev.injectors.email.EmailContract.EMAIL_DEFAULT;
 import static io.openaev.rest.scenario.ScenarioApi.SCENARIO_URI;
-import static io.openaev.utils.JsonUtils.asJsonString;
+import static io.openaev.utils.JsonTestUtils.asJsonString;
 import static io.openaev.utils.fixtures.InjectFixture.getInjectForEmailContract;
 import static io.openaev.utils.fixtures.ScenarioFixture.createDefaultCrisisScenario;
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -16,8 +16,8 @@ import io.openaev.database.model.Inject;
 import io.openaev.database.model.InjectorContract;
 import io.openaev.database.model.Scenario;
 import io.openaev.database.repository.InjectRepository;
-import io.openaev.database.repository.InjectorContractRepository;
 import io.openaev.database.repository.ScenarioRepository;
+import io.openaev.utils.fixtures.InjectorContractFixture;
 import io.openaev.utils.fixtures.PaginationFixture;
 import io.openaev.utils.mockUser.WithMockUser;
 import io.openaev.utils.pagination.SearchPaginationInput;
@@ -35,8 +35,8 @@ public class ScenarioInjectApiSearchTest extends IntegrationTest {
   @Autowired private MockMvc mvc;
 
   @Autowired private InjectRepository injectRepository;
-  @Autowired private InjectorContractRepository injectorContractRepository;
   @Autowired private ScenarioRepository scenarioRepository;
+  @Autowired private InjectorContractFixture injectorContractFixture;
 
   private static final List<String> INJECT_IDS = new ArrayList<>();
   private static String SCENARIO_ID;
@@ -44,8 +44,7 @@ public class ScenarioInjectApiSearchTest extends IntegrationTest {
 
   @BeforeAll
   void beforeAll() {
-    InjectorContract injectorContract =
-        this.injectorContractRepository.findById(EMAIL_DEFAULT).orElseThrow();
+    InjectorContract injectorContract = injectorContractFixture.getWellKnownSingleEmailContract();
     EMAIL_INJECTOR_CONTRACT_ID = injectorContract.getInjector().getId();
 
     Scenario scenario = createDefaultCrisisScenario();
@@ -91,7 +90,8 @@ public class ScenarioInjectApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(SCENARIO_URI + "/" + SCENARIO_ID + "/injects/simple")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.numberOfElements").value(1));
       }
@@ -105,7 +105,8 @@ public class ScenarioInjectApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(SCENARIO_URI + "/" + SCENARIO_ID + "/injects/simple")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.numberOfElements").value(0));
       }
@@ -127,7 +128,8 @@ public class ScenarioInjectApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(SCENARIO_URI + "/" + SCENARIO_ID + "/injects/simple")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.content.[0].inject_title").value("Inject default email"))
             .andExpect(jsonPath("$.content.[1].inject_title").value("Inject global email"));
@@ -150,7 +152,8 @@ public class ScenarioInjectApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(SCENARIO_URI + "/" + SCENARIO_ID + "/injects/simple")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.content.[0].inject_title").value("Inject global email"))
             .andExpect(jsonPath("$.content.[1].inject_title").value("Inject default email"));
@@ -171,7 +174,8 @@ public class ScenarioInjectApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(SCENARIO_URI + "/" + SCENARIO_ID + "/injects/simple")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.numberOfElements").value(2));
       }
@@ -188,7 +192,8 @@ public class ScenarioInjectApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(SCENARIO_URI + "/" + SCENARIO_ID + "/injects/simple")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.numberOfElements").value(2));
       }

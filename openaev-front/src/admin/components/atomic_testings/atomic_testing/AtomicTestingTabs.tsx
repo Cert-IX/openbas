@@ -57,16 +57,6 @@ const AtomicTestingTabs = ({ injectResultOverview }: Props) => {
         label={t('Overview')}
         className={classes.item}
       />
-      {(injectResultOverview.inject_injector_contract?.injector_contract_payload
-        || externalContractTypesWithFindings.includes(injectResultOverview.inject_type ?? '')) && (
-        <Tab
-          component={Link}
-          to={`/admin/atomic_testings/${injectResultOverview.inject_id}/findings`}
-          value={`/admin/atomic_testings/${injectResultOverview.inject_id}/findings`}
-          label={t('Findings')}
-          className={classes.item}
-        />
-      )}
       <Tab
         component={Link}
         to={`/admin/atomic_testings/${injectResultOverview.inject_id}/detail`}
@@ -83,6 +73,16 @@ const AtomicTestingTabs = ({ injectResultOverview }: Props) => {
           className={classes.item}
         />
       )}
+      {(injectResultOverview.inject_injector_contract?.injector_contract_payload
+        || externalContractTypesWithFindings.includes(injectResultOverview.inject_type ?? '')) && (
+        <Tab
+          component={Link}
+          to={`/admin/atomic_testings/${injectResultOverview.inject_id}/findings`}
+          value={`/admin/atomic_testings/${injectResultOverview.inject_id}/findings`}
+          label={t('Findings')}
+          className={classes.item}
+        />
+      )}
       {injectResultOverview.inject_injector_contract?.injector_contract_payload && (
         <Tab
           component={Link}
@@ -96,7 +96,6 @@ const AtomicTestingTabs = ({ injectResultOverview }: Props) => {
                 <EEChip
                   style={{ marginLeft: theme.spacing(1) }}
                   clickable
-                  featureDetectedInfo={t('Remediation')}
                 />
               )}
             </Box>

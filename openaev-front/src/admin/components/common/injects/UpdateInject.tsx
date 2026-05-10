@@ -23,7 +23,7 @@ import {
 import { type InjectorContractConverted } from '../../../../utils/api-types-custom';
 import { useAppDispatch } from '../../../../utils/hooks';
 import useDataLoader from '../../../../utils/hooks/useDataLoader';
-import { AbilityContext } from '../../../../utils/permissions/PermissionsProvider';
+import { AbilityContext } from '../../../../utils/permissions/permissionsContext';
 import { ACTIONS, INHERITED_CONTEXT, SUBJECTS } from '../../../../utils/permissions/types';
 import { arrayToRecord, isNotEmptyField } from '../../../../utils/utils';
 import PayloadComponent from '../../payloads/PayloadComponent';
@@ -184,7 +184,8 @@ const UpdateInject: React.FC<Props> = ({
             <InjectForm
               handleClose={handleClose}
               disabled={
-                !injectorContractContent
+                !inject.inject_enabled
+                || !injectorContractContent
                 || permissions.readOnly
                 || (inherited_context === INHERITED_CONTEXT.NONE
                   && ability.cannot(ACTIONS.MANAGE, SUBJECTS.RESOURCE, injectId))
@@ -222,8 +223,9 @@ const UpdateInject: React.FC<Props> = ({
               onUpdateInject={massUpdateInject}
               injects={injects}
               isDisabled={
-                !permissions.canManage
-                && ability.cannot(ACTIONS.MANAGE, SUBJECTS.RESOURCE, injectId)
+                !inject.inject_enabled
+                || (!permissions.canManage
+                  && ability.cannot(ACTIONS.MANAGE, SUBJECTS.RESOURCE, injectId))
               }
             />
           )}

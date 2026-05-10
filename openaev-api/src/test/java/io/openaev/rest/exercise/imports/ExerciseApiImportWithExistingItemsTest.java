@@ -3,6 +3,7 @@ package io.openaev.rest.exercise.imports;
 import static io.openaev.rest.exercise.ExerciseApi.EXERCISE_URI;
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -10,6 +11,9 @@ import io.openaev.IntegrationTest;
 import io.openaev.database.model.*;
 import io.openaev.database.model.Tag;
 import io.openaev.database.repository.*;
+import io.openaev.integration.Manager;
+import io.openaev.integration.impl.injectors.challenge.ChallengeInjectorIntegrationFactory;
+import io.openaev.integration.impl.injectors.channel.ChannelInjectorIntegrationFactory;
 import io.openaev.rest.exercise.exports.ExportOptions;
 import io.openaev.rest.exercise.service.ExportService;
 import io.openaev.service.ChallengeService;
@@ -66,11 +70,16 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
   @Autowired private ExportService exportService;
   @Autowired private EntityManager entityManager;
   @Autowired private ChallengeService challengeService;
+  @Autowired private ChannelInjectorIntegrationFactory channelInjectorIntegrationFactory;
+  @Autowired private ChallengeInjectorIntegrationFactory challengeInjectorIntegrationFactory;
 
   private static final int FULL_EXPORT_OPTIONS = ExportOptions.mask(true, true, true);
 
   @BeforeEach
-  void before() {
+  void before() throws Exception {
+    new Manager(List.of(channelInjectorIntegrationFactory, challengeInjectorIntegrationFactory))
+        .monitorIntegrations();
+
     lessonsQuestionsComposer.reset();
     lessonsCategoryComposer.reset();
     teamComposer.reset();
@@ -178,7 +187,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -209,7 +219,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -242,7 +253,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -280,7 +292,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -329,7 +342,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -361,7 +375,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -397,7 +412,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -429,7 +445,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -477,7 +494,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -510,7 +528,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -559,7 +578,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -591,7 +611,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -621,7 +642,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -672,7 +694,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -702,7 +725,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -750,7 +774,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations
@@ -782,7 +807,8 @@ public class ExerciseApiImportWithExistingItemsTest extends IntegrationTest {
     mvc.perform(
             multipart(EXERCISE_URI + "/import")
                 .file(mmf)
-                .contentType(MediaType.MULTIPART_FORM_DATA))
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // force hibernate to clear its cache to not pollute fetch operations

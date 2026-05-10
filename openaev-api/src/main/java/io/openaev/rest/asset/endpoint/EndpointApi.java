@@ -1,25 +1,22 @@
 package io.openaev.rest.asset.endpoint;
 
 import static io.openaev.helper.StreamHelper.fromIterable;
-import static io.openaev.helper.StreamHelper.iterableToSet;
 
 import io.openaev.aop.LogExecutionTime;
 import io.openaev.aop.RBAC;
 import io.openaev.database.model.Action;
-import io.openaev.database.model.Agent;
 import io.openaev.database.model.AssetAgentJob;
 import io.openaev.database.model.Endpoint;
 import io.openaev.database.model.ResourceType;
-import io.openaev.database.model.Tag;
 import io.openaev.database.repository.AssetAgentJobRepository;
 import io.openaev.database.repository.EndpointRepository;
-import io.openaev.database.repository.TagRepository;
 import io.openaev.database.specification.AssetAgentJobSpecification;
 import io.openaev.database.specification.EndpointSpecification;
 import io.openaev.rest.asset.endpoint.form.*;
 import io.openaev.rest.asset.endpoint.output.EndpointTargetOutput;
 import io.openaev.rest.exception.BadRequestException;
 import io.openaev.rest.helper.RestBehavior;
+import io.openaev.rest.inject.service.InjectStatusService;
 import io.openaev.service.EndpointService;
 import io.openaev.utils.FilterUtilsJpa;
 import io.openaev.utils.HttpReqRespUtils;
@@ -31,8 +28,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -50,9 +45,9 @@ public class EndpointApi extends RestBehavior {
   public static final String ENDPOINT_URI = "/api/endpoints";
 
   private final EndpointService endpointService;
+  private final InjectStatusService injectStatusService;
   private final EndpointRepository endpointRepository;
   private final AssetAgentJobRepository assetAgentJobRepository;
-  private final TagRepository tagRepository;
 
   private final EndpointMapper endpointMapper;
 
@@ -67,52 +62,7 @@ public class EndpointApi extends RestBehavior {
   @RBAC(actionPerformed = Action.CREATE, resourceType = ResourceType.ASSET)
   @Transactional(rollbackFor = Exception.class)
   public Endpoint upsertAgentLessEndpoint(@Valid @RequestBody final EndpointInput input) {
-    Optional<Endpoint> endpoint = Optional.empty();
-    if (input.getExternalReference() != null) {
-      endpoint = this.endpointService.findEndpointByExternalReference(input.getExternalReference());
-    }
-    if (endpoint.isEmpty() && input.getIps() != null) {
-      List<Endpoint> endpoints =
-          this.endpointService.findEndpointByHostnameAndAtLeastOneIp(
-              input.getHostname(), input.getIps());
-      if (!endpoints.isEmpty()) {
-        endpoint = Optional.of(endpoints.getFirst());
-      }
-    }
-    if (endpoint.isEmpty() && input.getMacAddresses() != null) {
-      List<Endpoint> endpoints =
-          this.endpointService.findEndpointByHostnameAndAtLeastOneMacAddress(
-              input.getHostname(), input.getMacAddresses());
-      if (!endpoints.isEmpty()) {
-        endpoint = Optional.of(endpoints.getFirst());
-      }
-    }
-    if (endpoint.isPresent()) {
-      Endpoint endpointToUpdate = endpoint.get();
-      // Mandatory fields
-      endpointToUpdate.setName(input.getName());
-      Iterable<String> tags =
-          Stream.concat(
-                  endpointToUpdate.getTags().stream().map(Tag::getId).toList().stream(),
-                  input.getTagIds().stream())
-              .distinct()
-              .toList();
-      endpointToUpdate.setTags(iterableToSet(tagRepository.findAllById(tags)));
-      endpointToUpdate.setArch(input.getArch());
-      endpointToUpdate.setPlatform(input.getPlatform());
-      // Optional fields
-      if (input.getIps() != null) {
-        endpointToUpdate.setIps(EndpointMapper.setIps(input.getIps()));
-      }
-      if (input.getHostname() != null) {
-        endpointToUpdate.setHostname(input.getHostname());
-      }
-      if (input.getMacAddresses() != null) {
-        endpointToUpdate.setMacAddresses(input.getMacAddresses());
-      }
-      return this.endpointService.updateEndpoint(endpointToUpdate);
-    }
-    return this.endpointService.createEndpoint(input);
+    return this.endpointService.upsertEndpoint(input);
   }
 
   @PostMapping(ENDPOINT_URI + "/register")
@@ -129,14 +79,9 @@ public class EndpointApi extends RestBehavior {
   @RBAC(actionPerformed = Action.READ, resourceType = ResourceType.ASSET)
   @Transactional(rollbackFor = Exception.class)
   public List<AssetAgentJob> getEndpointJobs(@RequestBody final EndpointRegisterInput input) {
-    return this.assetAgentJobRepository.findAll(
-        AssetAgentJobSpecification.forEndpoint(
-            input.getExternalReference(),
-            input.isService()
-                ? Agent.DEPLOYMENT_MODE.service.name()
-                : Agent.DEPLOYMENT_MODE.session.name(),
-            input.isElevated() ? Agent.PRIVILEGE.admin.name() : Agent.PRIVILEGE.standard.name(),
-            input.getExecutedByUser()));
+    List<AssetAgentJob> jobs = this.endpointService.getEndpointJobs(input);
+    this.injectStatusService.addJobRetrievalTraces(jobs);
+    return jobs;
   }
 
   @Deprecated(since = "1.11.0")

@@ -1,12 +1,15 @@
 package io.openaev.rest;
 
 import static io.openaev.rest.cve.CveApi.CVE_API;
-import static io.openaev.utils.JsonUtils.asJsonString;
+import static io.openaev.utils.JsonTestUtils.asJsonString;
 import static io.openaev.utils.fixtures.VulnerabilityFixture.CVE_2025_5678;
 import static io.openaev.utils.fixtures.VulnerabilityFixture.VULNERABILITY_EXTERNAL_ID;
 import static java.time.Instant.now;
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -14,6 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.openaev.IntegrationTest;
 import io.openaev.database.model.Collector;
 import io.openaev.database.model.Vulnerability;
+import io.openaev.database.repository.CollectorRepository;
 import io.openaev.database.repository.VulnerabilityRepository;
 import io.openaev.rest.cve.form.CVEBulkInsertInput;
 import io.openaev.rest.cve.form.CveCreateInput;
@@ -28,6 +32,7 @@ import jakarta.annotation.Resource;
 import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -46,6 +51,7 @@ class CveApiTest extends IntegrationTest {
   @Autowired private VulnerabilityComposer vulnerabilityComposer;
   @Autowired private CollectorComposer collectorComposer;
   @Autowired private VulnerabilityRepository vulnerabilityRepository;
+  @Autowired private CollectorRepository collectorRepository;
 
   @BeforeAll
   void init() {
@@ -78,7 +84,8 @@ class CveApiTest extends IntegrationTest {
           mvc.perform(
                   post(CVE_API)
                       .contentType(MediaType.APPLICATION_JSON)
-                      .content(asJsonString(input)))
+                      .content(asJsonString(input))
+                      .with(csrf()))
               .andExpect(status().isOk())
               .andReturn()
               .getResponse()
@@ -98,7 +105,7 @@ class CveApiTest extends IntegrationTest {
       vulnerabilityComposer.forVulnerability(cve).persist();
 
       String response =
-          mvc.perform(get(CVE_API + "/" + cve.getId()))
+          mvc.perform(get(CVE_API + "/" + cve.getId()).with(csrf()))
               .andExpect(status().isOk())
               .andReturn()
               .getResponse()
@@ -122,7 +129,8 @@ class CveApiTest extends IntegrationTest {
       mvc.perform(
               put(CVE_API + "/" + cve.getId())
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(asJsonString(updateInput)))
+                  .content(asJsonString(updateInput))
+                  .with(csrf()))
           .andExpect(status().isOk())
           .andReturn()
           .getResponse()
@@ -156,7 +164,8 @@ class CveApiTest extends IntegrationTest {
               post(CVE_API + "/bulk")
                   .content(asJsonString(input))
                   .contentType(MediaType.APPLICATION_JSON)
-                  .accept(MediaType.APPLICATION_JSON))
+                  .accept(MediaType.APPLICATION_JSON)
+                  .with(csrf()))
           .andExpect(status().isOk())
           .andReturn()
           .getResponse()
@@ -164,6 +173,18 @@ class CveApiTest extends IntegrationTest {
 
       Assertions.assertTrue(
           vulnerabilityRepository.findByExternalId(VULNERABILITY_EXTERNAL_ID).isPresent());
+      entityManager.flush();
+
+      // Verify that the collector state was updated with bulk insert metadata
+      Optional<Collector> savedCollector = collectorRepository.findById(collector.getId());
+      if (savedCollector.isEmpty()) {
+        fail("Collector not found after bulk insert");
+      }
+      assertThat(savedCollector.get().getState()).isNotNull();
+      assertThat(savedCollector.get().getState().get("last_index").asText()).isEqualTo("1234");
+      assertThat(savedCollector.get().getState().get("initial_dataset_completed").asBoolean())
+          .isFalse();
+      assertThat(savedCollector.get().getState().has("last_modified_date_fetched")).isTrue();
     }
 
     @Test
@@ -175,7 +196,8 @@ class CveApiTest extends IntegrationTest {
       cve.setDescription("To be deleted");
       vulnerabilityComposer.forVulnerability(cve).persist();
 
-      mvc.perform(delete(CVE_API + "/" + cve.getExternalId())).andExpect(status().isOk());
+      mvc.perform(delete(CVE_API + "/" + cve.getExternalId()).with(csrf()))
+          .andExpect(status().isOk());
 
       Assertions.assertFalse(vulnerabilityRepository.findById(cve.getExternalId()).isPresent());
     }
@@ -204,7 +226,8 @@ class CveApiTest extends IntegrationTest {
                   post(CVE_API + "/search")
                       .content(asJsonString(input))
                       .contentType(MediaType.APPLICATION_JSON)
-                      .accept(MediaType.APPLICATION_JSON))
+                      .accept(MediaType.APPLICATION_JSON)
+                      .with(csrf()))
               .andExpect(status().isOk())
               .andReturn()
               .getResponse()

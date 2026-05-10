@@ -1,47 +1,50 @@
 package io.openaev.service.stix;
 
+import static io.openaev.utils.SecurityCoverageUtils.extractAndValidateCoverage;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.openaev.database.model.Scenario;
-import io.openaev.database.model.SecurityCoverage;
-import io.openaev.rest.exception.BadRequestException;
+import io.openaev.opencti.errors.ConnectorError;
+import io.openaev.service.stix.error.BundleValidationError;
+import io.openaev.stix.objects.Bundle;
+import io.openaev.stix.objects.ObjectBase;
+import io.openaev.stix.objects.constants.CommonProperties;
 import io.openaev.stix.parsing.Parser;
 import io.openaev.stix.parsing.ParsingException;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @RequiredArgsConstructor
 @Service
 public class StixService {
-
-  private final SecurityCoverageService securityCoverageService;
-  private final ObjectMapper objectMapper;
   private final Parser stixParser;
+  private final ObjectMapper objectMapper;
+  private final SecurityCoverageService securityCoverageService;
 
   /**
    * Generate or update a Scenario from Stix bundle
    *
-   * @param stixJson
+   * @param stixJson string form of the provided stix bundle
    * @return Scenario
    */
-  @Transactional(rollbackFor = Exception.class)
-  public Scenario processBundle(String stixJson) throws IOException, ParsingException {
+  public Scenario processBundle(String stixJson)
+      throws IOException, ParsingException, ConnectorError, BundleValidationError {
+    Bundle bundle = stixParser.parseBundle(stixJson);
 
-    try {
-      // Update securityCoverage with the last bundle
-      SecurityCoverage securityCoverage =
-          securityCoverageService.processAndBuildStixToSecurityCoverage(stixJson);
+    return processSecurityCoverage(bundle);
+  }
 
-      // Update Scenario using the last SecurityCoverage
-      Scenario scenario =
-          securityCoverageService.buildScenarioFromSecurityCoverage(securityCoverage);
-      return scenario;
-    } catch (BadRequestException | ParsingException e) {
-      throw e;
-    }
+  private Scenario processSecurityCoverage(Bundle bundle)
+      throws BundleValidationError, ParsingException, ConnectorError, IOException {
+    ObjectBase securityCoverageObj = extractAndValidateCoverage(bundle);
+    String securityCoverageStixId =
+        securityCoverageObj.getRequiredProperty(CommonProperties.ID.toString());
+
+    return securityCoverageService.handleSecurityCoverageProcessing(
+        securityCoverageStixId, securityCoverageObj, bundle);
   }
 
   /**

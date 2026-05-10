@@ -3,6 +3,7 @@ package io.openaev.api.detection_remediation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -69,6 +70,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
 
   @Autowired private AttackPatternComposer attackPatternComposer;
 
+  @Autowired private DomainComposer domainComposer;
+
   @Autowired private EntityManager entityManager;
 
   @Resource protected ObjectMapper mapper;
@@ -82,9 +85,11 @@ public class DetectionRemediationApiTest extends IntegrationTest {
   @DisplayName("Generate AI rules detection remediation by payload , EE not available")
   public void getDetectionRemediationRuleByPayloadWithoutLicenceEE() {
     // -- PREPARE -
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
 
     Command payload =
-        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand()).get();
+        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand(domains)).get();
 
     List<String> attackPatternsIds =
         payload.getAttackPatterns().stream().map(AttackPattern::getId).toList();
@@ -102,7 +107,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                             + "/rules/"
                             + CROWDSTRIKE_FRONTEND_NAME)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(input))))
+                        .content(mapper.writeValueAsString(input))
+                        .with(csrf())))
         .hasCauseInstanceOf(IllegalStateException.class)
         .hasMessage(
             "Request processing failed: java.lang.IllegalStateException: Enterprise Edition is not available");
@@ -112,8 +118,11 @@ public class DetectionRemediationApiTest extends IntegrationTest {
   @DisplayName("Generate AI rules detection remediation by payload for unknow collector type")
   public void getDetectionRemediationRuleByPayloadForUnknowCollectorType() {
     // -- PREPARE -
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
+
     Command payload =
-        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand()).get();
+        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand(domains)).get();
 
     List<String> attackPatternsIds =
         payload.getAttackPatterns().stream().map(AttackPattern::getId).toList();
@@ -127,7 +136,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                             + DetectionRemediationApi.DETECTION_REMEDIATION_URI
                             + "/rules/collector_name_unknow")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(input))))
+                        .content(mapper.writeValueAsString(input))
+                        .with(csrf())))
         .hasCauseInstanceOf(IllegalStateException.class)
         .hasMessage(
             "Request processing failed: java.lang.IllegalStateException: Collector :\"collector_name_unknow\" unsupported");
@@ -139,8 +149,11 @@ public class DetectionRemediationApiTest extends IntegrationTest {
   public void getDetectionRemediationRuleByPayloadWithBadDetectionRemediationAIResponse()
       throws Exception {
     // -- PREPARE -
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
+
     Command payload =
-        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand()).get();
+        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand(domains)).get();
 
     List<String> attackPatternsIds =
         payload.getAttackPatterns().stream().map(AttackPattern::getId).toList();
@@ -161,7 +174,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                     + "/rules/"
                     + CROWDSTRIKE_FRONTEND_NAME)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(input)))
+                .content(mapper.writeValueAsString(input))
+                .with(csrf()))
         .andExpect(status().isBadGateway());
   }
 
@@ -170,9 +184,13 @@ public class DetectionRemediationApiTest extends IntegrationTest {
       "Generate AI rules detection remediation by payload with retry until service unavailable")
   public void
       getDetectionRemediationRuleByPayloadWithRetryDetectionRemediationAIResponseUnavailable()
-          throws Exception { // -- PREPARE -
+          throws Exception {
+    // -- PREPARE -
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
+
     Command payload =
-        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand()).get();
+        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand(domains)).get();
 
     List<String> attackPatternsIds =
         payload.getAttackPatterns().stream().map(AttackPattern::getId).toList();
@@ -203,7 +221,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                     + "/rules/"
                     + CROWDSTRIKE_FRONTEND_NAME)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(input)))
+                .content(mapper.writeValueAsString(input))
+                .with(csrf()))
         .andExpect(status().isServiceUnavailable());
   }
 
@@ -212,9 +231,13 @@ public class DetectionRemediationApiTest extends IntegrationTest {
       "Generate AI rules detection remediation by payload with retry until bad gateway (platform issue)")
   public void
       getDetectionRemediationRuleByPayloadWithRetryDetectionRemediationAIResponseBadGateway()
-          throws Exception { // -- PREPARE -
+          throws Exception {
+    // -- PREPARE -
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
+
     Command payload =
-        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand()).get();
+        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand(domains)).get();
 
     List<String> attackPatternsIds =
         payload.getAttackPatterns().stream().map(AttackPattern::getId).toList();
@@ -247,7 +270,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                     + "/rules/"
                     + CROWDSTRIKE_FRONTEND_NAME)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(input)))
+                .content(mapper.writeValueAsString(input))
+                .with(csrf()))
         .andExpect(status().isBadGateway());
   }
 
@@ -255,9 +279,13 @@ public class DetectionRemediationApiTest extends IntegrationTest {
   @DisplayName(
       "Generate AI rules detection remediation by payload with retry until service available")
   public void getDetectionRemediationRuleByPayloadWithRetryDetectionRemediationAIResponse()
-      throws Exception { // -- PREPARE -
+      throws Exception {
+    // -- PREPARE -
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
+
     Command payload =
-        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand()).get();
+        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand(domains)).get();
 
     List<String> attackPatternsIds =
         payload.getAttackPatterns().stream().map(AttackPattern::getId).toList();
@@ -291,7 +319,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                     + "/rules/"
                     + CROWDSTRIKE_FRONTEND_NAME)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(input)))
+                .content(mapper.writeValueAsString(input))
+                .with(csrf()))
         .andExpect(status().isOk());
   }
 
@@ -301,8 +330,11 @@ public class DetectionRemediationApiTest extends IntegrationTest {
   public void getDetectionRemediationRuleBasedPayloadCommandCrowdStrikeWithRules() {
 
     // -- PREPARE -
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
+
     Command payload =
-        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand()).get();
+        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand(domains)).get();
 
     List<String> attackPatternsIds =
         payload.getAttackPatterns().stream().map(AttackPattern::getId).toList();
@@ -325,7 +357,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                             + "/rules/"
                             + CROWDSTRIKE_FRONTEND_NAME)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(input))))
+                        .content(mapper.writeValueAsString(input))
+                        .with(csrf())))
         .hasCauseInstanceOf(IllegalStateException.class)
         .hasMessage(
             "Request processing failed: java.lang.IllegalStateException: AI Webservice available only for empty content");
@@ -338,8 +371,11 @@ public class DetectionRemediationApiTest extends IntegrationTest {
       getDetectionRemediationRuleBasedOnPayloadCommandCrowdStrikeWithoutAttackPatternAndArguments()
           throws Exception {
     // -- PREPARE -
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
+
     Command payload =
-        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand()).get();
+        (Command) payloadComposer.forPayload(PayloadFixture.createDefaultCommand(domains)).get();
 
     List<String> attackPatternsIds =
         payload.getAttackPatterns().stream().map(AttackPattern::getId).toList();
@@ -363,7 +399,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                         + "/rules/"
                         + CROWDSTRIKE_FRONTEND_NAME)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(input)))
+                    .content(mapper.writeValueAsString(input))
+                    .with(csrf()))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -405,12 +442,15 @@ public class DetectionRemediationApiTest extends IntegrationTest {
 
     List<PayloadArgument> payloadArguments = getPayloadArguments();
 
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
+
     Command payload =
         (Command)
             payloadComposer
                 .forPayload(
                     PayloadFixture.createDefaultCommandWithAttackPatternAndArguments(
-                        attackPatterns, payloadArguments))
+                        attackPatterns, payloadArguments, domains))
                 .get();
 
     PayloadInput input = payloadComposer.forPayloadInput(payload, attackPatternsIds);
@@ -433,7 +473,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                         + "/rules/"
                         + CROWDSTRIKE_FRONTEND_NAME)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(input)))
+                    .content(mapper.writeValueAsString(input))
+                    .with(csrf()))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -475,12 +516,15 @@ public class DetectionRemediationApiTest extends IntegrationTest {
 
     List<PayloadArgument> payloadArguments = getPayloadArguments();
 
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
+
     Command payload =
         (Command)
             payloadComposer
                 .forPayload(
                     PayloadFixture.createDefaultCommandWithAttackPatternAndArguments(
-                        attackPatterns, payloadArguments))
+                        attackPatterns, payloadArguments, domains))
                 .get();
 
     PayloadInput input = payloadComposer.forPayloadInput(payload, attackPatternsIds);
@@ -503,7 +547,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                         + "/rules/"
                         + SPLUNK_FRONTEND_NAME)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(input)))
+                    .content(mapper.writeValueAsString(input))
+                    .with(csrf()))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -528,12 +573,14 @@ public class DetectionRemediationApiTest extends IntegrationTest {
 
     List<PayloadArgument> payloadArguments = getPayloadArguments();
 
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
     DnsResolution payload =
         (DnsResolution)
             payloadComposer
                 .forPayload(
                     PayloadFixture.createDefaultDnsResolutionWithAttackPatternAndArguments(
-                        attackPatterns, payloadArguments))
+                        attackPatterns, payloadArguments, domains))
                 .get();
 
     PayloadInput input = payloadComposer.forPayloadInput(payload, attackPatternsIds);
@@ -556,7 +603,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                         + "/rules/"
                         + CROWDSTRIKE_FRONTEND_NAME)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(input)))
+                    .content(mapper.writeValueAsString(input))
+                    .with(csrf()))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -598,12 +646,14 @@ public class DetectionRemediationApiTest extends IntegrationTest {
 
     List<PayloadArgument> payloadArguments = getPayloadArguments();
 
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
     DnsResolution payload =
         (DnsResolution)
             payloadComposer
                 .forPayload(
                     PayloadFixture.createDefaultDnsResolutionWithAttackPatternAndArguments(
-                        attackPatterns, payloadArguments))
+                        attackPatterns, payloadArguments, domains))
                 .get();
 
     PayloadInput input = payloadComposer.forPayloadInput(payload, attackPatternsIds);
@@ -626,7 +676,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                         + "/rules/"
                         + SPLUNK_FRONTEND_NAME)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(mapper.writeValueAsString(input)))
+                    .content(mapper.writeValueAsString(input))
+                    .with(csrf()))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -650,12 +701,15 @@ public class DetectionRemediationApiTest extends IntegrationTest {
 
     List<PayloadArgument> payloadArguments = getPayloadArguments();
 
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
+
     FileDrop payload =
         (FileDrop)
             payloadComposer
                 .forPayload(
                     PayloadFixture.createDefaultFileDropWithAttackPatternAndArguments(
-                        attackPatterns, payloadArguments))
+                        attackPatterns, payloadArguments, domains))
                 .withFileDrop(
                     documentComposer.forDocument(
                         DocumentFixture.getDocument(FileFixture.getPlainTextFileContent())))
@@ -671,7 +725,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                     + "/rules/"
                     + CROWDSTRIKE_FRONTEND_NAME)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(input)));
+                .content(mapper.writeValueAsString(input))
+                .with(csrf()));
 
     // -- ASSERT --
     output.andExpect(status().isNotImplemented());
@@ -688,12 +743,15 @@ public class DetectionRemediationApiTest extends IntegrationTest {
 
     List<PayloadArgument> payloadArguments = getPayloadArguments();
 
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
+
     FileDrop payload =
         (FileDrop)
             payloadComposer
                 .forPayload(
                     PayloadFixture.createDefaultFileDropWithAttackPatternAndArguments(
-                        attackPatterns, payloadArguments))
+                        attackPatterns, payloadArguments, domains))
                 .withFileDrop(
                     documentComposer.forDocument(
                         DocumentFixture.getDocument(FileFixture.getPlainTextFileContent())))
@@ -709,7 +767,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                     + "/rules/"
                     + SPLUNK_FRONTEND_NAME)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(input)));
+                .content(mapper.writeValueAsString(input))
+                .with(csrf()));
 
     // -- ASSERT --
     output.andExpect(status().isNotImplemented());
@@ -726,12 +785,14 @@ public class DetectionRemediationApiTest extends IntegrationTest {
 
     List<PayloadArgument> payloadArguments = getPayloadArguments();
 
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
     Executable payload =
         (Executable)
             payloadComposer
                 .forPayload(
                     PayloadFixture.createDefaultExecutableWithAttackPatternAndArguments(
-                        attackPatterns, payloadArguments))
+                        attackPatterns, payloadArguments, domains))
                 .withExecutable(
                     documentComposer.forDocument(
                         DocumentFixture.getDocument(FileFixture.getPngGridFileContent())))
@@ -747,7 +808,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                     + "/rules/"
                     + CROWDSTRIKE_FRONTEND_NAME)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(input)));
+                .content(mapper.writeValueAsString(input))
+                .with(csrf()));
 
     // -- ASSERT --
     output.andExpect(status().isNotImplemented());
@@ -764,12 +826,14 @@ public class DetectionRemediationApiTest extends IntegrationTest {
 
     List<PayloadArgument> payloadArguments = getPayloadArguments();
 
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
     Executable payload =
         (Executable)
             payloadComposer
                 .forPayload(
                     PayloadFixture.createDefaultExecutableWithAttackPatternAndArguments(
-                        attackPatterns, payloadArguments))
+                        attackPatterns, payloadArguments, domains))
                 .withExecutable(
                     documentComposer.forDocument(
                         DocumentFixture.getDocument(FileFixture.getPngGridFileContent())))
@@ -785,7 +849,8 @@ public class DetectionRemediationApiTest extends IntegrationTest {
                     + "/rules/"
                     + SPLUNK_FRONTEND_NAME)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(input)));
+                .content(mapper.writeValueAsString(input))
+                .with(csrf()));
 
     // -- ASSERT --
     output.andExpect(status().isNotImplemented());
@@ -810,13 +875,13 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     assertThatThrownBy(
             () ->
                 mockMvc.perform(
-                    post(
-                        "/"
+                    post("/"
                             + DetectionRemediationApi.DETECTION_REMEDIATION_URI
                             + "/rules/inject/"
                             + inject.getId()
                             + "/collector/"
-                            + CROWDSTRIKE_FRONTEND_NAME)))
+                            + CROWDSTRIKE_FRONTEND_NAME)
+                        .with(csrf())))
         .hasCauseInstanceOf(IllegalStateException.class)
         .hasMessage(
             "Request processing failed: java.lang.IllegalStateException: Enterprise Edition is not available");
@@ -832,12 +897,12 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     MockHttpServletResponse output =
         mockMvc
             .perform(
-                post(
-                    "/"
+                post("/"
                         + DetectionRemediationApi.DETECTION_REMEDIATION_URI
                         + "/rules/inject/"
                         + inject.getId()
-                        + "/collector/collector_name_unknow"))
+                        + "/collector/collector_name_unknow")
+                    .with(csrf()))
             .andReturn()
             .getResponse();
 
@@ -870,13 +935,13 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     assertThatThrownBy(
             () ->
                 mockMvc.perform(
-                    post(
-                        "/"
+                    post("/"
                             + DetectionRemediationApi.DETECTION_REMEDIATION_URI
                             + "/rules/inject/"
                             + inject.getId()
                             + "/collector/"
-                            + CROWDSTRIKE_FRONTEND_NAME)))
+                            + CROWDSTRIKE_FRONTEND_NAME)
+                        .with(csrf())))
         .hasCauseInstanceOf(IllegalStateException.class)
         .hasMessage(
             "Request processing failed: java.lang.IllegalStateException: AI Webservice available only for empty content");
@@ -912,13 +977,13 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     // -- EXECUTE --
     mockMvc
         .perform(
-            post(
-                "/"
+            post("/"
                     + DetectionRemediationApi.DETECTION_REMEDIATION_URI
                     + "/rules/inject/"
                     + inject.getId()
                     + "/collector/"
-                    + CROWDSTRIKE_FRONTEND_NAME))
+                    + CROWDSTRIKE_FRONTEND_NAME)
+                .with(csrf()))
         .andExpect(status().isOk());
   }
 
@@ -948,13 +1013,13 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     String output =
         mockMvc
             .perform(
-                post(
-                    "/"
+                post("/"
                         + DetectionRemediationApi.DETECTION_REMEDIATION_URI
                         + "/rules/inject/"
                         + inject.getId()
                         + "/collector/"
-                        + CROWDSTRIKE_FRONTEND_NAME))
+                        + CROWDSTRIKE_FRONTEND_NAME)
+                    .with(csrf()))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -1016,13 +1081,13 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     String output =
         mockMvc
             .perform(
-                post(
-                    "/"
+                post("/"
                         + DetectionRemediationApi.DETECTION_REMEDIATION_URI
                         + "/rules/inject/"
                         + inject.getId()
                         + "/collector/"
-                        + SPLUNK_FRONTEND_NAME))
+                        + SPLUNK_FRONTEND_NAME)
+                    .with(csrf()))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -1069,13 +1134,13 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     String output =
         mockMvc
             .perform(
-                post(
-                    "/"
+                post("/"
                         + DetectionRemediationApi.DETECTION_REMEDIATION_URI
                         + "/rules/inject/"
                         + inject.getId()
                         + "/collector/"
-                        + CROWDSTRIKE_FRONTEND_NAME))
+                        + CROWDSTRIKE_FRONTEND_NAME)
+                    .with(csrf()))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -1139,13 +1204,13 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     String output =
         mockMvc
             .perform(
-                post(
-                    "/"
+                post("/"
                         + DetectionRemediationApi.DETECTION_REMEDIATION_URI
                         + "/rules/inject/"
                         + inject.getId()
                         + "/collector/"
-                        + SPLUNK_FRONTEND_NAME))
+                        + SPLUNK_FRONTEND_NAME)
+                    .with(csrf()))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -1190,13 +1255,13 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     // -- EXECUTE --
     ResultActions output =
         mockMvc.perform(
-            post(
-                "/"
+            post("/"
                     + DetectionRemediationApi.DETECTION_REMEDIATION_URI
                     + "/rules/inject/"
                     + inject.getId()
                     + "/collector/"
-                    + CROWDSTRIKE_FRONTEND_NAME));
+                    + CROWDSTRIKE_FRONTEND_NAME)
+                .with(csrf()));
 
     // -- ASSERT --
     output.andExpect(status().isNotImplemented());
@@ -1226,13 +1291,13 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     // -- EXECUTE --
     ResultActions output =
         mockMvc.perform(
-            post(
-                "/"
+            post("/"
                     + DetectionRemediationApi.DETECTION_REMEDIATION_URI
                     + "/rules/inject/"
                     + inject.getId()
                     + "/collector/"
-                    + SPLUNK_FRONTEND_NAME));
+                    + SPLUNK_FRONTEND_NAME)
+                .with(csrf()));
 
     // -- ASSERT --
     output.andExpect(status().isNotImplemented());
@@ -1263,13 +1328,13 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     // -- EXECUTE --
     ResultActions output =
         mockMvc.perform(
-            post(
-                "/"
+            post("/"
                     + DetectionRemediationApi.DETECTION_REMEDIATION_URI
                     + "/rules/inject/"
                     + inject.getId()
                     + "/collector/"
-                    + CROWDSTRIKE_FRONTEND_NAME));
+                    + CROWDSTRIKE_FRONTEND_NAME)
+                .with(csrf()));
 
     // -- ASSERT --
     output.andExpect(status().isNotImplemented());
@@ -1299,13 +1364,13 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     // -- EXECUTE --
     ResultActions output =
         mockMvc.perform(
-            post(
-                "/"
+            post("/"
                     + DetectionRemediationApi.DETECTION_REMEDIATION_URI
                     + "/rules/inject/"
                     + inject.getId()
                     + "/collector/"
-                    + SPLUNK_FRONTEND_NAME));
+                    + SPLUNK_FRONTEND_NAME)
+                .with(csrf()));
 
     // -- ASSERT --
     output.andExpect(status().isNotImplemented());
@@ -1318,12 +1383,15 @@ public class DetectionRemediationApiTest extends IntegrationTest {
 
     List<PayloadArgument> payloadArguments = getPayloadArguments();
 
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
+
     Command payloadCommand =
         (Command)
             payloadComposer
                 .forPayload(
                     PayloadFixture.createDefaultCommandWithAttackPatternAndArguments(
-                        attackPatterns, payloadArguments))
+                        attackPatterns, payloadArguments, domains))
                 .persist()
                 .get();
 
@@ -1351,6 +1419,10 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     List<AttackPattern> attackPatterns = saveAndGetAttackPatterns();
 
     List<PayloadArgument> payloadArguments = getPayloadArguments();
+
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
+
     DetectionRemediation detectionRemediation = new DetectionRemediation();
     detectionRemediation.setValues("I have a rule");
     detectionRemediation.setAuthorRule(DetectionRemediation.AUTHOR_RULE.HUMAN);
@@ -1358,7 +1430,7 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     Command payload =
         (Command)
             PayloadFixture.createDefaultCommandWithAttackPatternAndArguments(
-                attackPatterns, payloadArguments);
+                attackPatterns, payloadArguments, domains);
 
     return injectComposer
         .forInject(InjectFixture.getDefaultInject())
@@ -1382,6 +1454,10 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     List<AttackPattern> attackPatterns = saveAndGetAttackPatterns();
 
     List<PayloadArgument> payloadArguments = getPayloadArguments();
+
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
+
     DetectionRemediation detectionRemediation = new DetectionRemediation();
     detectionRemediation.setValues("");
     detectionRemediation.setAuthorRule(DetectionRemediation.AUTHOR_RULE.HUMAN);
@@ -1389,7 +1465,7 @@ public class DetectionRemediationApiTest extends IntegrationTest {
     Command payload =
         (Command)
             PayloadFixture.createDefaultCommandWithAttackPatternAndArguments(
-                attackPatterns, payloadArguments);
+                attackPatterns, payloadArguments, domains);
 
     return injectComposer
         .forInject(InjectFixture.getDefaultInject())
@@ -1413,12 +1489,14 @@ public class DetectionRemediationApiTest extends IntegrationTest {
 
     List<PayloadArgument> payloadArguments = getPayloadArguments();
 
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
     DnsResolution payload =
         (DnsResolution)
             payloadComposer
                 .forPayload(
                     PayloadFixture.createDefaultDnsResolutionWithAttackPatternAndArguments(
-                        attackPatterns, payloadArguments))
+                        attackPatterns, payloadArguments, domains))
                 .persist()
                 .get();
 
@@ -1444,13 +1522,15 @@ public class DetectionRemediationApiTest extends IntegrationTest {
       throws JsonProcessingException {
     List<AttackPattern> attackPatterns = saveAndGetAttackPatterns();
     List<PayloadArgument> payloadArguments = getPayloadArguments();
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
 
     FileDrop payload =
         (FileDrop)
             payloadComposer
                 .forPayload(
                     PayloadFixture.createDefaultFileDropWithAttackPatternAndArguments(
-                        attackPatterns, payloadArguments))
+                        attackPatterns, payloadArguments, domains))
                 .withFileDrop(
                     documentComposer.forDocument(
                         DocumentFixture.getDocument(FileFixture.getPlainTextFileContent())))
@@ -1479,13 +1559,15 @@ public class DetectionRemediationApiTest extends IntegrationTest {
       throws JsonProcessingException {
     List<AttackPattern> attackPatterns = saveAndGetAttackPatterns();
 
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
     List<PayloadArgument> payloadArguments = getPayloadArguments();
     Executable payload =
         (Executable)
             payloadComposer
                 .forPayload(
                     PayloadFixture.createDefaultExecutableWithAttackPatternAndArguments(
-                        attackPatterns, payloadArguments))
+                        attackPatterns, payloadArguments, domains))
                 .withExecutable(
                     documentComposer.forDocument(
                         DocumentFixture.getDocument(FileFixture.getPngGridFileContent())))

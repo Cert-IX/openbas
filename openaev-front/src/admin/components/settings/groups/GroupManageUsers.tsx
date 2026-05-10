@@ -15,6 +15,7 @@ import { resolveUserName } from '../../../../utils/String';
 
 interface Props {
   initialState: string[];
+  groupName: string;
   open: boolean;
   onClose: () => void;
   onSubmit: (userIds: string[]) => void;
@@ -22,6 +23,7 @@ interface Props {
 
 const GroupManageUsers: FunctionComponent<Props> = ({
   initialState = [],
+  groupName,
   open,
   onClose,
   onSubmit,
@@ -49,7 +51,7 @@ const GroupManageUsers: FunctionComponent<Props> = ({
       },
       {
         field: 'user_organization_name',
-        value: (user: UserOutput) => user.user_organization_name,
+        value: (user: UserOutput) => user.user_organization_name ?? '',
         width: 20,
       },
       {
@@ -86,11 +88,13 @@ const GroupManageUsers: FunctionComponent<Props> = ({
     handleClose();
   };
 
+  const title = t('Manage users for group: {groupName}', { groupName });
+
   return (
     <Drawer
       open={open}
       handleClose={handleClose}
-      title={t('Manage the users of this group')}
+      title={title}
       variant="full"
     >
       <Box sx={{ marginTop: 2 }}>

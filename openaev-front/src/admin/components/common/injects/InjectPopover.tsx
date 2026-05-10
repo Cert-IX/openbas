@@ -6,6 +6,7 @@ import { duplicateInjectForExercise, duplicateInjectForScenario } from '../../..
 import { type InjectStore } from '../../../../actions/injects/Inject';
 import { exportInject } from '../../../../actions/injects/inject-action';
 import ButtonPopover from '../../../../components/common/ButtonPopover';
+import DialogDelete from '../../../../components/common/DialogDelete';
 import DialogDuplicate from '../../../../components/common/DialogDuplicate';
 import DialogTest from '../../../../components/common/DialogTest';
 import ExportOptionsDialog from '../../../../components/common/export/ExportOptionsDialog';
@@ -38,6 +39,7 @@ interface Props {
   inject: InjectPopoverType;
   setSelectedInjectId: (injectId: Inject['inject_id']) => void;
   isDisabled?: boolean;
+  isUpdateDisabled?: boolean;
   canBeTested?: boolean;
   canDone?: boolean;
   canTriggerNow?: boolean;
@@ -56,6 +58,7 @@ const InjectPopover: FunctionComponent<Props> = ({
   inject,
   setSelectedInjectId,
   isDisabled = false,
+  isUpdateDisabled = true,
   canBeTested = false,
   canDone = false,
   canTriggerNow = false,
@@ -146,7 +149,7 @@ const InjectPopover: FunctionComponent<Props> = ({
       const contentDisposition = result.headers['content-disposition'];
       const match = contentDisposition.match(/filename\s*=\s*(.*)/i);
       const filename = match[1];
-      download(result.data, filename, result.headers['content-type']);
+      download(result.data, filename, result.headers['content-type']?.toString());
     });
     handleExportClose();
   };
@@ -215,55 +218,55 @@ const InjectPopover: FunctionComponent<Props> = ({
   // Button Popover
   const entries = [];
   entries.push({
-    label: t('Update'),
+    label: 'Update',
     action: () => handleOpenEditContent(),
-    disabled: isDisabled,
+    disabled: isDisabled || isUpdateDisabled,
     userRight: permissions.canManage,
   });
   entries.push({
-    label: t('Duplicate'),
+    label: 'Duplicate',
     action: () => handleOpenDuplicate(),
     disabled: isDisabled,
     userRight: permissions.canManage,
   });
   if (inject.inject_testable && canBeTested) entries.push({
-    label: t('Test'),
+    label: 'Test',
     action: () => handleOpenTest(),
     disabled: isDisabled,
     userRight: permissions.canManage,
   });
   entries.push({
-    label: t('inject_export_json_single'),
+    label: 'inject_export_json_single',
     action: () => handleExportOpen(),
     disabled: isDisabled,
     userRight: true,
   });
   if (!inject.inject_status && onInjectDone && canDone) entries.push({
-    label: t('Mark as done'),
+    label: 'Mark as done',
     action: () => handleOpenDone(),
     disabled: isDisabled,
     userRight: permissions.canManage,
   });
   if (inject.inject_type !== 'openaev_manual' && canTriggerNow && onUpdateInjectTrigger) entries.push({
-    label: t('Trigger now'),
+    label: 'Trigger now',
     action: () => handleOpenTrigger(),
     disabled: isDisabled || !permissions.isRunning,
     userRight: permissions.canLaunch,
   });
   if (inject.inject_enabled) entries.push({
-    label: t('Disable'),
+    label: 'Disable',
     action: () => handleOpenDisable(),
     disabled: isDisabled,
     userRight: permissions.canManage,
   });
   else entries.push({
-    label: t('Enable'),
+    label: 'Enable',
     action: () => handleOpenEnable(),
     disabled: isDisabled,
     userRight: permissions.canManage,
   });
   entries.push({
-    label: t('Delete'),
+    label: 'Delete',
     action: () => handleOpenDelete(),
     disabled: isDisabled,
     userRight: permissions.canManage,
@@ -280,10 +283,10 @@ const InjectPopover: FunctionComponent<Props> = ({
         text={`${t('Do you want to duplicate this inject:')} ${inject.inject_title} ?`}
       />
       <Dialog
-        TransitionComponent={Transition}
+        slots={{ transition: Transition }}
         open={openDone}
         onClose={handleCloseDone}
-        PaperProps={{ elevation: 1 }}
+        slotProps={{ paper: { elevation: 1 } }}
       >
         <DialogContent>
           <DialogContentText>
@@ -299,26 +302,12 @@ const InjectPopover: FunctionComponent<Props> = ({
           </Button>
         </DialogActions>
       </Dialog>
-      <Dialog
+      <DialogDelete
         open={openDelete}
-        TransitionComponent={Transition}
-        onClose={handleCloseDelete}
-        PaperProps={{ elevation: 1 }}
-      >
-        <DialogContent>
-          <DialogContentText>
-            {`${t('Do you want to delete this inject:')} ${inject.inject_title} ?`}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDelete}>
-            {t('Cancel')}
-          </Button>
-          <Button color="secondary" onClick={submitDelete}>
-            {t('Delete')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        handleClose={handleCloseDelete}
+        handleSubmit={submitDelete}
+        text={`${t('Do you want to delete this inject:')} ${inject.inject_title} ?`}
+      />
       <DialogTest
         open={openTest}
         handleClose={handleCloseTest}
@@ -326,10 +315,10 @@ const InjectPopover: FunctionComponent<Props> = ({
         text={`${t('Do you want to test this inject:')} ${inject.inject_title} ?`}
       />
       <Dialog
-        TransitionComponent={Transition}
+        slots={{ transition: Transition }}
         open={openEnable}
         onClose={handleCloseEnable}
-        PaperProps={{ elevation: 1 }}
+        slotProps={{ paper: { elevation: 1 } }}
       >
         <DialogContent>
           <DialogContentText>
@@ -346,10 +335,10 @@ const InjectPopover: FunctionComponent<Props> = ({
         </DialogActions>
       </Dialog>
       <Dialog
-        TransitionComponent={Transition}
+        slots={{ transition: Transition }}
         open={openDisable}
         onClose={handleCloseDisable}
-        PaperProps={{ elevation: 1 }}
+        slotProps={{ paper: { elevation: 1 } }}
       >
         <DialogContent>
           <DialogContentText>
@@ -366,30 +355,10 @@ const InjectPopover: FunctionComponent<Props> = ({
         </DialogActions>
       </Dialog>
       <Dialog
-        TransitionComponent={Transition}
-        open={openDone}
-        onClose={handleCloseDone}
-        PaperProps={{ elevation: 1 }}
-      >
-        <DialogContent>
-          <DialogContentText>
-            {t(`Do you want to mark this inject as done: ${inject.inject_title}?`)}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDone}>
-            {t('Cancel')}
-          </Button>
-          <Button color="secondary" onClick={submitDone}>
-            {t('Mark')}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog
-        TransitionComponent={Transition}
+        slots={{ transition: Transition }}
         open={openTrigger}
         onClose={handleCloseTrigger}
-        PaperProps={{ elevation: 1 }}
+        slotProps={{ paper: { elevation: 1 } }}
       >
         <DialogContent>
           <DialogContentText>

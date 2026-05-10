@@ -2,10 +2,11 @@ package io.openaev.rest.search;
 
 import static io.openaev.search.FullTextSearchApi.GLOBAL_SEARCH_URI;
 import static io.openaev.service.UserService.buildAuthenticationToken;
-import static io.openaev.utils.JsonUtils.asJsonString;
+import static io.openaev.utils.JsonTestUtils.asJsonString;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -24,10 +25,7 @@ import io.openaev.utils.fixtures.composers.RoleComposer;
 import io.openaev.utils.fixtures.composers.UserComposer;
 import io.openaev.utils.mockUser.WithMockUser;
 import io.openaev.utils.pagination.SearchPaginationInput;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -113,7 +111,8 @@ public class FullTextSearchTest extends IntegrationTest {
     mvc.perform(
             post(GLOBAL_SEARCH_URI)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(asJsonString(term)))
+                .content(asJsonString(term))
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful())
         .andExpect(jsonPath("$['" + Scenario.class.getName() + "'].count").value(expectedCount));
   }
@@ -151,7 +150,8 @@ public class FullTextSearchTest extends IntegrationTest {
     mvc.perform(
             post(GLOBAL_SEARCH_URI + "/" + Scenario.class.getName())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(asJsonString(searchPaginationInput)))
+                .content(asJsonString(searchPaginationInput))
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful())
         .andExpect(jsonPath("$.content.size()").value(expectedCount))
         .andExpect(jsonPath("$.content[*].id", containsInAnyOrder(expectedIds.toArray())));
@@ -226,7 +226,8 @@ public class FullTextSearchTest extends IntegrationTest {
     mvc.perform(
             post(GLOBAL_SEARCH_URI + "/" + Scenario.class.getName())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(asJsonString(searchPaginationInput)))
+                .content(asJsonString(searchPaginationInput))
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful())
         .andExpect(jsonPath("$.content.size()").value(expectedCount))
         .andExpect(jsonPath("$.content[*].id", containsInAnyOrder(expectedIds.toArray())));
@@ -284,7 +285,8 @@ public class FullTextSearchTest extends IntegrationTest {
             .forGroup(GroupFixture.createGroup())
             .withRole(
                 roleComposer.forRole(
-                    RoleFixture.getRole(capability == null ? Set.of() : Set.of(capability))));
+                    RoleFixture.getRole(
+                        capability == null ? new HashSet<>() : new HashSet<>(Set.of(capability)))));
 
     this.testUser =
         userComposer
@@ -302,7 +304,8 @@ public class FullTextSearchTest extends IntegrationTest {
             post(GLOBAL_SEARCH_URI + "/" + Asset.class.getName())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(asJsonString(searchPaginationInput))
-                .with(authentication(auth)))
+                .with(authentication(auth))
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful())
         .andExpect(jsonPath("$.content.size()").value(expectedCount))
         .andExpect(jsonPath("$.content[*].id", containsInAnyOrder(expectedIds.toArray())));
@@ -326,7 +329,8 @@ public class FullTextSearchTest extends IntegrationTest {
             .forGroup(GroupFixture.createGroup())
             .withRole(
                 roleComposer.forRole(
-                    RoleFixture.getRole(capability == null ? Set.of() : Set.of(capability))));
+                    RoleFixture.getRole(
+                        capability == null ? new HashSet<>() : new HashSet<>(Set.of(capability)))));
 
     this.testUser =
         userComposer
@@ -345,7 +349,8 @@ public class FullTextSearchTest extends IntegrationTest {
                 post(GLOBAL_SEARCH_URI)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(asJsonString(term))
-                    .with(authentication(auth)))
+                    .with(authentication(auth))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful());
 
     if (expectedCount == 0) {

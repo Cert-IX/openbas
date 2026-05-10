@@ -1,14 +1,14 @@
 package io.openaev.rest;
 
-import static io.openaev.utils.JsonUtils.asJsonString;
+import static io.openaev.utils.JsonTestUtils.asJsonString;
 import static io.openaev.utils.fixtures.UserFixture.EMAIL;
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -22,9 +22,11 @@ import io.openaev.database.model.User;
 import io.openaev.database.repository.*;
 import io.openaev.rest.user.form.login.LoginUserInput;
 import io.openaev.rest.user.form.login.ResetUserInput;
+import io.openaev.rest.user.form.user.ChangePasswordInput;
 import io.openaev.rest.user.form.user.CreateUserInput;
 import io.openaev.rest.user.form.user.UpdateUserInput;
 import io.openaev.service.MailingService;
+import io.openaev.utils.RandomUtils;
 import io.openaev.utils.fixtures.OrganizationFixture;
 import io.openaev.utils.fixtures.ScenarioFixture;
 import io.openaev.utils.fixtures.TagFixture;
@@ -32,10 +34,13 @@ import io.openaev.utils.fixtures.UserFixture;
 import io.openaev.utils.fixtures.composers.OrganizationComposer;
 import io.openaev.utils.fixtures.composers.TagComposer;
 import io.openaev.utils.fixtures.composers.UserComposer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import net.javacrumbs.jsonunit.core.Option;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.*;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,8 +53,6 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 @TestInstance(PER_CLASS)
 class UserApiTest extends IntegrationTest {
 
-  private User savedUser;
-
   @Autowired private MockMvc mvc;
 
   @Autowired private UserRepository userRepository;
@@ -61,6 +64,8 @@ class UserApiTest extends IntegrationTest {
   @Autowired private TagComposer tagComposer;
 
   @MockBean private MailingService mailingService;
+  @MockBean private RandomUtils randomUtils;
+
   @Autowired private UserComposer userComposer;
   @Autowired private OrganizationComposer organisationComposer;
   @Autowired private TagRepository tagRepository;
@@ -72,9 +77,9 @@ class UserApiTest extends IntegrationTest {
     user.setEmail(EMAIL);
     user.setPassword(UserFixture.ENCODED_PASSWORD);
     if (this.userRepository.findByEmailIgnoreCase(EMAIL).isEmpty()) {
-      savedUser = this.userRepository.save(user);
+      this.userRepository.save(user);
     } else {
-      savedUser = this.userRepository.findByEmailIgnoreCase(EMAIL).get();
+      this.userRepository.findByEmailIgnoreCase(EMAIL).get();
     }
   }
 
@@ -103,7 +108,8 @@ class UserApiTest extends IntegrationTest {
         mvc.perform(
                 post("/api/login")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(loginUserInput)))
+                    .content(asJsonString(loginUserInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("user_email").value(EMAIL));
       }
@@ -118,7 +124,8 @@ class UserApiTest extends IntegrationTest {
         mvc.perform(
                 post("/api/login")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(loginUserInput)))
+                    .content(asJsonString(loginUserInput))
+                    .with(csrf()))
             .andExpect(status().is4xxClientError());
       }
 
@@ -132,7 +139,8 @@ class UserApiTest extends IntegrationTest {
         mvc.perform(
                 post("/api/login")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(loginUserInput)))
+                    .content(asJsonString(loginUserInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("user_email").value(EMAIL));
       }
@@ -147,7 +155,8 @@ class UserApiTest extends IntegrationTest {
         mvc.perform(
                 post("/api/login")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(loginUserInput)))
+                    .content(asJsonString(loginUserInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("user_email").value(EMAIL));
       }
@@ -167,7 +176,8 @@ class UserApiTest extends IntegrationTest {
       mvc.perform(
               post("/api/users")
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(asJsonString(input)))
+                  .content(asJsonString(input))
+                  .with(csrf()))
           .andExpect(status().isConflict());
     }
 
@@ -181,7 +191,8 @@ class UserApiTest extends IntegrationTest {
       mvc.perform(
               post("/api/users")
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(asJsonString(input)))
+                  .content(asJsonString(input))
+                  .with(csrf()))
           .andExpect(status().isConflict());
     }
   }
@@ -222,7 +233,8 @@ class UserApiTest extends IntegrationTest {
           mvc.perform(
                   MockMvcRequestBuilders.put("/api/users/" + userWrapper.get().getId())
                       .contentType(MediaType.APPLICATION_JSON)
-                      .content(asJsonString(updateUserInput)))
+                      .content(asJsonString(updateUserInput))
+                      .with(csrf()))
               .andExpect(status().is2xxSuccessful())
               .andReturn()
               .getResponse()
@@ -290,16 +302,154 @@ class UserApiTest extends IntegrationTest {
       mvc.perform(
               post("/api/reset")
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(asJsonString(input)))
+                  .content(asJsonString(input))
+                  .with(csrf()))
           .andExpect(status().isOk());
 
       // -- ASSERT --
       ArgumentCaptor<List<User>> userCaptor = ArgumentCaptor.forClass(List.class);
-      verify(mailingService).sendEmail(anyString(), anyString(), userCaptor.capture());
+      // not ideal, but the actual reset happens in a background thread!
+      Awaitility.await()
+          .atMost(1, TimeUnit.SECONDS)
+          .until(
+              () -> {
+                try {
+                  verify(mailingService).sendEmail(anyString(), anyString(), userCaptor.capture());
+                  return true;
+                } catch (Exception e) {
+                  return false;
+                }
+              });
       assertEquals(EMAIL, userCaptor.getValue().get(0).getEmail());
     }
 
-    @DisplayName("With a unknown email")
+    @DisplayName("Asking reset twice invalidates previous token")
+    @Test
+    void askingResetTwiceInvalidatesPreviousToken() throws Exception {
+      // -- PREPARE --
+      String firstToken = "et la tête";
+      String secondToken = "alouette";
+      when(randomUtils.getRandomAlphanumeric(anyInt())).thenReturn(firstToken, secondToken);
+
+      ResetUserInput input = UserFixture.getResetUserInput();
+      ChangePasswordInput changePasswordInput = UserFixture.getChangePasswordInput("le password");
+
+      // -- EXECUTE --
+      mvc.perform(
+              post("/api/reset")
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(asJsonString(input))
+                  .with(csrf()))
+          .andExpect(status().isOk());
+
+      // not ideal, but the actual reset happens in a background thread!
+      Awaitility.await()
+          .atMost(1, TimeUnit.SECONDS)
+          .until(
+              () -> {
+                try {
+                  ArgumentCaptor<List<User>> userCaptor = ArgumentCaptor.forClass(List.class);
+                  verify(mailingService, times(1))
+                      .sendEmail(anyString(), anyString(), userCaptor.capture());
+                  return true;
+                } catch (Exception e) {
+                  return false;
+                }
+              });
+
+      mvc.perform(
+              post("/api/reset")
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(asJsonString(input))
+                  .with(csrf()))
+          .andExpect(status().isOk());
+
+      // not ideal, but the actual reset happens in a background thread!
+      Awaitility.await()
+          .atMost(1, TimeUnit.SECONDS)
+          .until(
+              () -> {
+                try {
+                  ArgumentCaptor<List<User>> userCaptor = ArgumentCaptor.forClass(List.class);
+                  verify(mailingService, times(2))
+                      .sendEmail(anyString(), anyString(), userCaptor.capture());
+                  return true;
+                } catch (Exception e) {
+                  return false;
+                }
+              });
+
+      // -- ASSERT --
+      mvc.perform(
+              post("/api/reset/" + firstToken)
+                  .content(asJsonString(changePasswordInput))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .with(csrf()))
+          // should be 401 Access Denied
+          // but some black magic is changing the actual status code
+          // see RestBehavior.java
+          // expecting vague 4xx code in case we fix this some day
+          .andExpect(status().is4xxClientError());
+    }
+
+    @DisplayName("Consume token on successful reset")
+    @Test
+    void consumeTokenOnSuccessfulReset() throws Exception {
+      // -- PREPARE --
+      String firstToken = "et la tête";
+      when(randomUtils.getRandomAlphanumeric(anyInt())).thenReturn(firstToken);
+
+      ResetUserInput input = UserFixture.getResetUserInput();
+      ChangePasswordInput changePasswordInput = UserFixture.getChangePasswordInput("le password");
+
+      // -- EXECUTE --
+      mvc.perform(
+              post("/api/reset")
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(asJsonString(input))
+                  .with(csrf()))
+          .andExpect(status().isOk());
+
+      Awaitility.await()
+          .atMost(1, TimeUnit.SECONDS)
+          .until(
+              () -> {
+                try {
+                  ArgumentCaptor<List<User>> userCaptor = ArgumentCaptor.forClass(List.class);
+                  verify(mailingService).sendEmail(anyString(), anyString(), userCaptor.capture());
+                  return true;
+                } catch (Exception e) {
+                  return false;
+                }
+              });
+
+      mvc.perform(
+              post("/api/reset/" + firstToken)
+                  .content(asJsonString(changePasswordInput))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .with(csrf()))
+          // should be 401 Access Denied
+          // but some black magic is changing the actual status code
+          // see RestBehavior.java
+          // expecting vague 4xx code in case we fix this some day
+          .andExpect(status().isOk());
+
+      // -- ASSERT --
+
+      // cannot use same token again
+      mvc.perform(
+              post("/api/reset/" + firstToken)
+                  .content(asJsonString(changePasswordInput))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .with(csrf()))
+          // should be 401 Access Denied
+          // but some black magic is changing the actual status code
+          // see RestBehavior.java
+          // expecting vague 4xx code in case we fix this some day
+          .andExpect(status().is4xxClientError());
+    }
+
+    @DisplayName("With a unknown email should return 200 OK")
     @Test
     void resetPasswordWithUnknownEmail() throws Exception {
       // -- PREPARE --
@@ -310,8 +460,9 @@ class UserApiTest extends IntegrationTest {
       mvc.perform(
               post("/api/reset")
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(asJsonString(input)))
-          .andExpect(status().isBadRequest());
+                  .content(asJsonString(input))
+                  .with(csrf()))
+          .andExpect(status().isOk());
 
       // -- ASSERT --
       verify(mailingService, never()).sendEmail(anyString(), anyString(), any(List.class));
@@ -342,8 +493,8 @@ class UserApiTest extends IntegrationTest {
     grantPlanner.setGroup(group);
     grantPlanner.setName(Grant.GRANT_TYPE.PLANNER);
     grantRepository.saveAll(List.of(grantObserver, grantPlanner));
-    group.setGrants(List.of(grantObserver, grantPlanner));
-    group.setUsers(List.of(user));
+    group.setGrants(new ArrayList<>(List.of(grantObserver, grantPlanner)));
+    group.setUsers(new ArrayList<>(List.of(user)));
     groupRepository.save(group);
 
     UpdateUserInput updateUserInput = new UpdateUserInput();
@@ -355,7 +506,8 @@ class UserApiTest extends IntegrationTest {
         mvc.perform(
                 MockMvcRequestBuilders.put("/api/users/" + user.getId())
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(updateUserInput)))
+                    .content(asJsonString(updateUserInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andReturn()
             .getResponse()

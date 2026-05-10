@@ -1,12 +1,12 @@
 package io.openaev.rest.inject.service;
 
 import static io.openaev.utils.ExecutionTraceUtils.convertExecutionAction;
-import static io.openaev.utils.ExecutionTraceUtils.convertExecutionStatus;
+import static org.springframework.util.StringUtils.hasText;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.annotations.VisibleForTesting;
 import io.openaev.aop.lock.Lock;
 import io.openaev.aop.lock.LockResourceType;
+import io.openaev.database.helper.ExecutionTraceRepositoryHelper;
 import io.openaev.database.model.*;
 import io.openaev.database.repository.AgentRepository;
 import io.openaev.database.repository.InjectRepository;
@@ -15,13 +15,17 @@ import io.openaev.rest.exception.ElementNotFoundException;
 import io.openaev.rest.inject.form.InjectExecutionAction;
 import io.openaev.rest.inject.form.InjectExecutionInput;
 import io.openaev.rest.inject.form.InjectUpdateStatusInput;
+import io.openaev.utils.ExecutionTraceUtils;
+import io.openaev.utils.InjectStatusUtils;
 import io.openaev.utils.InjectUtils;
 import jakarta.annotation.Nullable;
+import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,9 +40,18 @@ public class InjectStatusService {
   private final InjectService injectService;
   private final InjectUtils injectUtils;
   private final InjectStatusRepository injectStatusRepository;
+  private final ExecutionTraceRepositoryHelper executionTraceRepositoryHelper;
 
-  public List<InjectStatus> findPendingInjectStatusByType(String injectType) {
-    return this.injectStatusRepository.pendingForInjectType(injectType);
+  private final EntityManager entityManager;
+
+  public InjectStatus findInjectStatusByInjectId(final String injectId) {
+    if (!hasText(injectId)) {
+      throw new IllegalArgumentException("InjectId should not be null");
+    }
+    return this.injectStatusRepository
+        .findByInjectId(injectId)
+        .orElseThrow(
+            () -> new ElementNotFoundException("Inject status not found for :" + injectId));
   }
 
   @Transactional(rollbackOn = Exception.class)
@@ -71,14 +84,29 @@ public class InjectStatusService {
     injectStatusRepository.save(injectStatus);
   }
 
+  public void addJobRetrievalTraces(List<AssetAgentJob> jobs) {
+    Map<String, List<AssetAgentJob>> jobsByInjectId =
+        jobs.stream()
+            .filter(j -> j.getInject() != null && j.getAgent() != null)
+            .collect(Collectors.groupingBy(j -> j.getInject().getId()));
+    if (jobsByInjectId.isEmpty()) {
+      return;
+    }
+    List<InjectStatus> statuses =
+        injectStatusRepository.findAllByInjectIdIn(jobsByInjectId.keySet());
+    for (InjectStatus status : statuses) {
+      for (AssetAgentJob job : jobsByInjectId.getOrDefault(status.getInject().getId(), List.of())) {
+        ExecutionTraceUtils.addJobRetrievalTrace(status, job.getAgent());
+      }
+    }
+    injectStatusRepository.saveAll(statuses);
+  }
+
   private int getCompleteTrace(Inject inject) {
-    return inject.getStatus().map(InjectStatus::getTraces).orElse(Collections.emptyList()).stream()
-        .filter(trace -> ExecutionTraceAction.COMPLETE.equals(trace.getAction()))
-        .filter(trace -> trace.getAgent() != null)
-        .map(trace -> trace.getAgent().getId())
-        .distinct()
-        .toList()
-        .size();
+    return inject
+        .getStatus()
+        .map(s -> ExecutionTraceUtils.getCompletedAgentIds(s.getTraces()).size())
+        .orElse(0);
   }
 
   public boolean isAllInjectAgentsExecuted(Inject inject) {
@@ -89,7 +117,7 @@ public class InjectStatusService {
 
   public void updateFinalInjectStatus(InjectStatus injectStatus) {
     ExecutionStatus finalStatus =
-        computeStatus(
+        InjectStatusUtils.computeStatus(
             injectStatus.getTraces().stream()
                 .filter(t -> ExecutionTraceAction.COMPLETE.equals(t.getAction()))
                 .toList());
@@ -156,80 +184,60 @@ public class InjectStatusService {
     return ExecutionTrace.from(base, structuredOutput);
   }
 
-  @VisibleForTesting
-  protected void computeExecutionTraceStatusIfNeeded(
-      InjectStatus injectStatus, ExecutionTrace executionTrace, Agent agent) {
-
-    // if the execution trace is COMPLETED with a status different than INFO -> no compute
-    if (agent != null
-        && executionTrace.getAction().equals(ExecutionTraceAction.COMPLETE)
-        && ExecutionTraceStatus.INFO.equals(executionTrace.getStatus())) {
-      ExecutionTraceStatus traceStatus =
-          convertExecutionStatus(
-              computeStatus(
-                  injectStatus.getTraces().stream()
-                      .filter(t -> t.getAgent() != null)
-                      .filter(t -> t.getAgent().getId().equals(agent.getId()))
-                      .toList()));
-      executionTrace.setStatus(traceStatus);
-    }
-  }
-
   public void updateInjectStatus(
-      Agent agent, Inject inject, InjectExecutionInput input, ObjectNode structuredOutput) {
+      Inject inject, Agent agent, InjectExecutionInput input, ObjectNode structuredOutput) {
     InjectStatus injectStatus = inject.getStatus().orElseThrow(ElementNotFoundException::new);
 
+    // Creating the Execution Trace
     ExecutionTrace executionTrace =
         createExecutionTrace(injectStatus, input, agent, structuredOutput);
-    computeExecutionTraceStatusIfNeeded(injectStatus, executionTrace, agent);
+    // Resolve the placeholder status of the COMPLETE trace
+    resolveCompleteTraceStatus(injectStatus, executionTrace, agent);
     injectStatus.addTrace(executionTrace);
+    // Save the trace using a low level call to the database
+    String executionTraceId = executionTraceRepositoryHelper.saveExecutionTrace(executionTrace);
+    executionTrace.setId(executionTraceId);
+    entityManager.merge(injectStatus);
 
+    // If the trace is complete
     if (executionTrace.getAction().equals(ExecutionTraceAction.COMPLETE)
         && (agent == null || isAllInjectAgentsExecuted(inject))) {
+      // We update the status of the inject
       updateFinalInjectStatus(injectStatus);
-      log.debug("Successfully updated inject final status: " + inject.getId());
+      executionTraceRepositoryHelper.updateInjectUpdateDate(
+          injectStatus.getInject().getId(), injectStatus.getInject().getUpdatedAt());
+      executionTraceRepositoryHelper.updateInjectStatus(
+          injectStatus.getId(), injectStatus.getName().name(), injectStatus.getTrackingEndDate());
+      log.debug("Successfully updated inject final status: {}", inject.getId());
     }
 
-    injectRepository.save(inject);
-    log.debug("Successfully updated inject: " + inject.getId());
+    log.debug("Successfully updated inject: {}", inject.getId());
   }
 
-  public ExecutionStatus computeStatus(List<ExecutionTrace> traces) {
-    ExecutionStatus executionStatus;
-    int successCount = 0, errorCount = 0, partialCount = 0, maybePreventedCount = 0;
+  /**
+   * Resolves the status of a COMPLETE trace when the implant sent the default INFO placeholder. The
+   * real status is computed from the agent's previous traces (prerequisite, execution, cleanup). If
+   * the implant sent an explicit status (not INFO), it is kept as-is.
+   */
+  protected void resolveCompleteTraceStatus(
+      InjectStatus injectStatus, ExecutionTrace executionTrace, Agent agent) {
 
-    for (ExecutionTrace trace : traces) {
-      switch (trace.getStatus()) {
-        case SUCCESS, WARNING, ASSET_AGENTLESS -> successCount++;
-        case PARTIAL -> partialCount++;
-        case ERROR, COMMAND_NOT_FOUND, AGENT_INACTIVE -> errorCount++;
-        case MAYBE_PREVENTED, MAYBE_PARTIAL_PREVENTED, COMMAND_CANNOT_BE_EXECUTED ->
-            maybePreventedCount++;
-        default ->
-            throw new IllegalArgumentException(
-                "Invalid execution trace status: " + trace.getStatus());
-      }
+    if (agent == null
+        || !ExecutionTraceAction.COMPLETE.equals(executionTrace.getAction())
+        || !ExecutionTraceStatus.INFO.equals(executionTrace.getStatus())) {
+      return;
     }
 
-    if (successCount > 0 && errorCount == 0 && maybePreventedCount == 0 && partialCount == 0) {
-      executionStatus = ExecutionStatus.SUCCESS;
-    } else if (errorCount > 0
-        && successCount == 0
-        && maybePreventedCount == 0
-        && partialCount == 0) {
-      executionStatus = ExecutionStatus.ERROR;
-    } else if (maybePreventedCount > 0
-        && successCount == 0
-        && errorCount == 0
-        && partialCount == 0) {
-      executionStatus = ExecutionStatus.MAYBE_PREVENTED;
-    } else if (partialCount > 0 && errorCount == 0 && maybePreventedCount == 0
-        || successCount > 0) {
-      executionStatus = ExecutionStatus.PARTIAL;
-    } else {
-      executionStatus = ExecutionStatus.MAYBE_PARTIAL_PREVENTED;
+    ExecutionTraceStatus computedStatus =
+        ExecutionTraceUtils.computeAgentTraceStatus(
+            injectStatus.getTraces().stream()
+                .filter(t -> t.getAgent() != null)
+                .filter(t -> t.getAgent().getId().equals(agent.getId()))
+                .toList());
+
+    if (computedStatus != null) {
+      executionTrace.setStatus(computedStatus);
     }
-    return executionStatus;
   }
 
   public InjectStatus fromExecution(Execution execution, InjectStatus injectStatus) {
@@ -258,6 +266,10 @@ public class InjectStatusService {
             });
   }
 
+  private StatusPayload getPayloadOutput(Inject inject) {
+    return injectUtils.getStatusPayloadFromInject(inject);
+  }
+
   public InjectStatus failInjectStatus(@NotNull String injectId, @Nullable String message) {
     Inject inject = this.injectRepository.findById(injectId).orElseThrow();
     InjectStatus injectStatus = getOrInitializeInjectStatus(inject);
@@ -266,7 +278,7 @@ public class InjectStatusService {
     }
     injectStatus.setName(ExecutionStatus.ERROR);
     injectStatus.setTrackingEndDate(Instant.now());
-    injectStatus.setPayloadOutput(injectUtils.getStatusPayloadFromInject(inject));
+    injectStatus.setPayloadOutput(getPayloadOutput(inject));
     return injectStatusRepository.save(injectStatus);
   }
 
@@ -277,12 +289,16 @@ public class InjectStatusService {
     InjectStatus injectStatus = getOrInitializeInjectStatus(inject);
     injectStatus.setName(status);
     injectStatus.setTrackingSentDate(Instant.now());
-    injectStatus.setPayloadOutput(injectUtils.getStatusPayloadFromInject(inject));
+    injectStatus.setPayloadOutput(getPayloadOutput(inject));
     return injectStatusRepository.save(injectStatus);
   }
 
   public Iterable<InjectStatus> saveAll(@NotNull List<InjectStatus> injectStatuses) {
     return this.injectStatusRepository.saveAll(injectStatuses);
+  }
+
+  public InjectStatus save(@NotNull InjectStatus injectStatus) {
+    return this.injectStatusRepository.save(injectStatus);
   }
 
   @Lock(type = LockResourceType.INJECT, key = "#injectId")
@@ -306,8 +322,21 @@ public class InjectStatusService {
       input.setMessage("Execution done");
       input.setStatus(ExecutionTraceStatus.INFO.name());
       input.setAction(InjectExecutionAction.complete);
-      this.updateInjectStatus(agent, inject, input, null);
+      this.updateInjectStatus(inject, agent, input, null);
     }
-    throw new IllegalArgumentException(message);
+  }
+
+  /**
+   * Delete all injects statuses for a list of injects
+   *
+   * @param injects the list of injects
+   */
+  public void deleteAllInjectStatusByInjects(List<Inject> injects) {
+    List<String> injectStatusIds =
+        injects.stream()
+            .map(Inject::getStatus)
+            .flatMap(i -> i.map(InjectStatus::getId).stream())
+            .toList();
+    injectStatusRepository.deleteAllByIds(injectStatusIds);
   }
 }

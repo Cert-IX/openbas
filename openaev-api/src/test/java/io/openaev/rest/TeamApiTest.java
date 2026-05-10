@@ -1,12 +1,12 @@
 package io.openaev.rest;
 
-import static io.openaev.injectors.email.EmailContract.EMAIL_DEFAULT;
 import static io.openaev.rest.team.TeamApi.TEAM_URI;
-import static io.openaev.utils.JsonUtils.asJsonString;
+import static io.openaev.utils.JsonTestUtils.asJsonString;
 import static io.openaev.utils.fixtures.InjectFixture.getInjectForEmailContract;
 import static io.openaev.utils.fixtures.TeamFixture.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -16,11 +16,11 @@ import io.openaev.database.model.Exercise;
 import io.openaev.database.model.Inject;
 import io.openaev.database.model.Team;
 import io.openaev.database.repository.InjectRepository;
-import io.openaev.database.repository.InjectorContractRepository;
 import io.openaev.database.repository.TeamRepository;
 import io.openaev.rest.exercise.service.ExerciseService;
 import io.openaev.rest.team.form.TeamCreateInput;
 import io.openaev.utils.fixtures.ExerciseFixture;
+import io.openaev.utils.fixtures.InjectorContractFixture;
 import io.openaev.utils.mockUser.WithMockUser;
 import jakarta.servlet.ServletException;
 import java.util.ArrayList;
@@ -48,8 +48,8 @@ class TeamApiTest extends IntegrationTest {
 
   @Autowired private ExerciseService exerciseService;
   @Autowired private InjectRepository injectRepository;
-  @Autowired private InjectorContractRepository injectorContractRepository;
   @Autowired private TeamRepository teamRepository;
+  @Autowired private InjectorContractFixture injectorContractFixture;
 
   @DisplayName("Given valid team input, should create a team successfully")
   @Test
@@ -64,7 +64,8 @@ class TeamApiTest extends IntegrationTest {
                 post(TEAM_URI)
                     .content(asJsonString(teamInput))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andReturn()
             .getResponse()
@@ -92,7 +93,8 @@ class TeamApiTest extends IntegrationTest {
                 post(TEAM_URI)
                     .content(asJsonString(teamInput))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .with(csrf()))
             .andExpect(status().is4xxClientError())
             .andReturn()
             .getResponse()
@@ -120,7 +122,8 @@ class TeamApiTest extends IntegrationTest {
                 post(TEAM_URI)
                     .content(asJsonString(teamInput))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andReturn()
             .getResponse()
@@ -151,7 +154,8 @@ class TeamApiTest extends IntegrationTest {
                 post(TEAM_URI)
                     .content(asJsonString(teamInput))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .with(csrf()))
             .andExpect(status().is4xxClientError())
             .andReturn()
             .getResponse()
@@ -182,7 +186,8 @@ class TeamApiTest extends IntegrationTest {
                 put(TEAM_URI + "/" + team.getId())
                     .content(asJsonString(teamInput))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andReturn()
             .getResponse()
@@ -211,7 +216,8 @@ class TeamApiTest extends IntegrationTest {
                 post(TEAM_URI + "/upsert")
                     .content(asJsonString(teamInput))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andReturn()
             .getResponse()
@@ -236,7 +242,8 @@ class TeamApiTest extends IntegrationTest {
                 post(TEAM_URI + "/upsert")
                     .content(asJsonString(teamInput))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andReturn()
             .getResponse()
@@ -270,7 +277,8 @@ class TeamApiTest extends IntegrationTest {
                     post(TEAM_URI + "/upsert")
                         .content(asJsonString(teamInput))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON)));
+                        .accept(MediaType.APPLICATION_JSON)
+                        .with(csrf())));
 
     String expectedMessage = "Contextual team can only be associated to one exercise";
     String actualMessage = exception.getMessage();
@@ -299,8 +307,7 @@ class TeamApiTest extends IntegrationTest {
     Exercise exercise = this.exerciseService.createExercise(exInput);
     // Inject
     Inject inject =
-        getInjectForEmailContract(
-            this.injectorContractRepository.findById(EMAIL_DEFAULT).orElseThrow());
+        getInjectForEmailContract(injectorContractFixture.getWellKnownSingleEmailContract());
     inject.setExercise(exercise);
     inject.setTeams(
         new ArrayList<>() {
@@ -352,7 +359,8 @@ class TeamApiTest extends IntegrationTest {
                 get(TEAM_URI + "/options")
                     .queryParam("searchText", searchText)
                     .queryParam("sourceId", simulationOrScenarioId ? exercise.getId() : null)
-                    .accept(MediaType.APPLICATION_JSON))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .with(csrf()))
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -392,7 +400,8 @@ class TeamApiTest extends IntegrationTest {
                 post(TEAM_URI + "/options")
                     .content(asJsonString(teamIdsToSearch))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .with(csrf()))
             .andReturn()
             .getResponse()
             .getContentAsString();

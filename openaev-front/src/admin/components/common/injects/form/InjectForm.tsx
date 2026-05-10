@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { useContext, useEffect, useState } from 'react';
 import { FormProvider, type SubmitHandler, useForm } from 'react-hook-form';
 import { makeStyles } from 'tss-react/mui';
@@ -103,6 +104,7 @@ const InjectForm = ({
 }: Props) => {
   const { classes } = useStyles();
   const { t } = useFormatter();
+  const theme = useTheme();
   const { permissions } = useContext(PermissionsContext);
   const [fieldsMapByKey, setFieldsMapByKey] = useState<Record<ContractElement['key'], ContractElement>>({});
   const [enhancedFields, setEnhancedFields] = useState<EnhancedContractElement[]>([]);
@@ -281,7 +283,7 @@ const InjectForm = ({
   useEffect(() => {
     const fieldsToSubscribe: (keyof InjectInputForm)[] = [];
     injectorContractContent?.fields.forEach((field) => {
-      if (field.key == 'teams') {
+      if (field.key === 'teams') {
         fieldsToSubscribe.push('inject_all_teams');
       }
       if (field.mandatoryConditionFields?.length) {
@@ -481,9 +483,9 @@ const InjectForm = ({
         {!isAtomic && (
           <div className={`${classes.triggerBox} ${isSubmitting || disabled || permissions.readOnly ? classes.triggerBoxColorDisabled : classes.triggerBoxColor}`}>
             <div className={`${classes.triggerText} ${isSubmitting || disabled || permissions.readOnly ? classes.triggerTextColorDisabled : classes.triggerTextColor}`}>{t('Trigger after')}</div>
-            <TextFieldController name="inject_depends_duration_days" label={t('Days')} type="number" disabled={permissions.readOnly} />
-            <TextFieldController name="inject_depends_duration_hours" label={t('Hours')} type="number" disabled={permissions.readOnly} />
-            <TextFieldController name="inject_depends_duration_minutes" label={t('Minutes')} type="number" disabled={permissions.readOnly} />
+            <TextFieldController name="inject_depends_duration_days" label={t('Days')} type="number" disabled={permissions.readOnly || disabled} />
+            <TextFieldController name="inject_depends_duration_hours" label={t('Hours')} type="number" disabled={permissions.readOnly || disabled} />
+            <TextFieldController name="inject_depends_duration_minutes" label={t('Minutes')} type="number" disabled={permissions.readOnly || disabled} />
           </div>
         )}
 
@@ -502,7 +504,13 @@ const InjectForm = ({
           />
         )}
 
-        <div className={classes.injectFormButtonsContainer}>
+        <div
+          className={classes.injectFormButtonsContainer}
+          style={{
+            marginBottom: theme.spacing(2),
+            marginRight: theme.spacing(2),
+          }}
+        >
           <Button
             variant="contained"
             onClick={handleClose}

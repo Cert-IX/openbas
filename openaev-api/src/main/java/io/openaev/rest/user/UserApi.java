@@ -20,8 +20,8 @@ import io.openaev.rest.user.form.user.CreateUserInput;
 import io.openaev.rest.user.form.user.UpdateUserInput;
 import io.openaev.rest.user.form.user.UserOutput;
 import io.openaev.rest.user.service.UserCriteriaBuilderService;
-import io.openaev.service.MailingService;
 import io.openaev.service.UserService;
+import io.openaev.service.user_events.UserEventService;
 import io.openaev.utils.pagination.SearchPaginationInput;
 import io.swagger.v3.oas.annotations.ExternalDocumentation;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,17 +36,17 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.Optional;
-import org.apache.commons.collections4.map.PassiveExpiringMap;
-import org.apache.commons.lang3.RandomStringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@EnableAsync
+@RequiredArgsConstructor
 @UserRoleDescription
 @Tag(
     name = "Users management",
@@ -59,32 +59,11 @@ public class UserApi extends RestBehavior {
 
   public static final String USER_URI = "/api/users";
 
-  PassiveExpiringMap<String, String> resetTokenMap = new PassiveExpiringMap<>(1000 * 60 * 10);
   @Resource private SessionManager sessionManager;
-  private UserRepository userRepository;
-  private UserService userService;
-  private MailingService mailingService;
-  private UserCriteriaBuilderService userCriteriaBuilderService;
-
-  @Autowired
-  public void setMailingService(MailingService mailingService) {
-    this.mailingService = mailingService;
-  }
-
-  @Autowired
-  public void setUserService(UserService userService) {
-    this.userService = userService;
-  }
-
-  @Autowired
-  public void setUserRepository(UserRepository userRepository) {
-    this.userRepository = userRepository;
-  }
-
-  @Autowired
-  public void setUserCriteriaBuilderService(UserCriteriaBuilderService userCriteriaBuilderService) {
-    this.userCriteriaBuilderService = userCriteriaBuilderService;
-  }
+  private final UserRepository userRepository;
+  private final UserService userService;
+  private final UserCriteriaBuilderService userCriteriaBuilderService;
+  private final UserEventService userEventService;
 
   @Operation(description = "Endpoint to login", summary = "Endpoint to login")
   @ApiResponses(
@@ -103,9 +82,12 @@ public class UserApi extends RestBehavior {
       User user = optionalUser.get();
       if (userService.isUserPasswordValid(user, input.getPassword())) {
         userService.createUserSession(user);
+        userEventService.createLoginSuccessEvent(user);
         return user;
       }
     }
+    userEventService.createLoginFailedEvent(
+        "local login", BadCredentialsException.class.getSimpleName());
     throw new BadCredentialsException("Invalid credential.");
   }
 
@@ -118,37 +100,11 @@ public class UserApi extends RestBehavior {
   @PostMapping("/api/reset")
   @RBAC(skipRBAC = true)
   public ResponseEntity<?> passwordReset(@Valid @RequestBody ResetUserInput input) {
-    Optional<User> optionalUser = userRepository.findByEmailIgnoreCase(input.getLogin());
-    if (optionalUser.isPresent()) {
-      User user = optionalUser.get();
-      String resetToken = RandomStringUtils.randomNumeric(8);
-      String username = user.getName() != null ? user.getName() : user.getEmail();
-      if ("fr".equals(input.getLang())) {
-        String subject = resetToken + " est votre code de récupération de compte OpenAEV";
-        String body =
-            "Bonjour "
-                + username
-                + ",</br>"
-                + "Nous avons reçu une demande de réinitialisation de votre mot de passe OpenAEV.</br>"
-                + "Entrez le code de réinitialisation du mot de passe suivant : "
-                + resetToken;
-        mailingService.sendEmail(subject, body, List.of(user));
-      } else {
-        String subject = resetToken + " is your recovery code of your OpenAEV account";
-        String body =
-            "Hi "
-                + username
-                + ",</br>"
-                + "A request has been made to reset your OpenAEV password.</br>"
-                + "Enter the following password recovery code: "
-                + resetToken;
-        mailingService.sendEmail(subject, body, List.of(user));
-      }
-      // Store in memory reset token
-      resetTokenMap.put(resetToken, user.getId());
-      return ResponseEntity.ok().build();
-    }
-    return ResponseEntity.badRequest().build();
+    // async execution; check method annotation
+    userService.requestPasswordReset(input);
+    // force a 200 OK response even if no user was found
+    // to avoid enumeration via status code
+    return ResponseEntity.ok().build();
   }
 
   @Operation(description = "Change the password", summary = "Password change")
@@ -165,21 +121,7 @@ public class UserApi extends RestBehavior {
       @PathVariable @Schema(description = "Token generated during reset") String token,
       @Valid @RequestBody ChangePasswordInput input)
       throws InputValidationException {
-    String userId = resetTokenMap.get(token);
-    if (userId != null) {
-      String password = input.getPassword();
-      String passwordValidation = input.getPasswordValidation();
-      if (!passwordValidation.equals(password)) {
-        throw new InputValidationException("password_validation", "Bad password validation");
-      }
-      User changeUser = userRepository.findById(userId).orElseThrow(ElementNotFoundException::new);
-      changeUser.setPassword(userService.encodeUserPassword(password));
-      User savedUser = userRepository.save(changeUser);
-      resetTokenMap.remove(token);
-      return savedUser;
-    }
-    // Bad token or expired token
-    throw new AccessDeniedException("Invalid credentials");
+    return userService.resetPassword(token, input);
   }
 
   @Operation(
@@ -196,7 +138,7 @@ public class UserApi extends RestBehavior {
   @RBAC(skipRBAC = true)
   public boolean validatePasswordResetToken(
       @PathVariable @Schema(description = "Token generated during reset") String token) {
-    return resetTokenMap.get(token) != null;
+    return userService.getResetToken(token);
   }
 
   @Operation(description = "List all the users", summary = "List users")

@@ -2,6 +2,7 @@ package io.openaev.rest.exercise.service;
 
 import static io.openaev.config.SessionHelper.currentUser;
 import static io.openaev.database.criteria.GenericCriteria.countQuery;
+import static io.openaev.database.model.Grant.GRANT_RESOURCE_TYPE.SIMULATION;
 import static io.openaev.database.specification.ExerciseSpecification.*;
 import static io.openaev.database.specification.TeamSpecification.fromIds;
 import static io.openaev.helper.StreamHelper.fromIterable;
@@ -10,6 +11,7 @@ import static io.openaev.utils.StringUtils.duplicateString;
 import static io.openaev.utils.constants.Constants.ARTICLES;
 import static io.openaev.utils.pagination.SortUtilsCriteriaBuilder.toSortCriteriaBuilderWithNullHandling;
 import static java.time.Instant.now;
+import static java.time.temporal.ChronoUnit.MINUTES;
 import static java.util.Collections.emptyList;
 import static java.util.Optional.ofNullable;
 
@@ -35,11 +37,8 @@ import io.openaev.rest.inject.service.InjectDuplicateService;
 import io.openaev.rest.inject.service.InjectService;
 import io.openaev.rest.scenario.service.ScenarioStatisticService;
 import io.openaev.rest.team.output.TeamOutput;
-import io.openaev.service.TagRuleService;
-import io.openaev.service.TeamService;
-import io.openaev.service.UserService;
-import io.openaev.service.VariableService;
-import io.openaev.service.cron.CronService;
+import io.openaev.service.*;
+import io.openaev.service.scenario.ScenarioRecurrenceService;
 import io.openaev.telemetry.metric_collectors.ActionMetricCollector;
 import io.openaev.utils.FilterUtilsJpa;
 import io.openaev.utils.InjectExpectationResultUtils.ExpectationResultsByType;
@@ -62,6 +61,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.hibernate.query.criteria.HibernateCriteriaBuilder;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
@@ -72,12 +72,15 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 
 @RequiredArgsConstructor
 @Validated
 @Service
+@Slf4j
 public class ExerciseService {
 
   @PersistenceContext private EntityManager entityManager;
@@ -89,8 +92,9 @@ public class ExerciseService {
   private final TagRuleService tagRuleService;
   private final DocumentService documentService;
   private final InjectService injectService;
-  private final CronService cronService;
   private final UserService userService;
+  private final GrantService grantService;
+  private final ExerciseTeamUserService exerciseTeamUserService;
 
   private final ExerciseMapper exerciseMapper;
   private final InjectMapper injectMapper;
@@ -110,6 +114,12 @@ public class ExerciseService {
   private final LessonsCategoryRepository lessonsCategoryRepository;
 
   private final InjectExpectationMapper injectExpectationMapper;
+
+  private final ScenarioRecurrenceService scenarioRecurrenceService;
+
+  private final PauseExerciseService pauseExerciseService;
+  private final FileService fileService;
+  private final LessonsService lessonsService;
 
   // region properties
   @Value("${openaev.mail.imap.enabled}")
@@ -180,13 +190,15 @@ public class ExerciseService {
     Exercise exercise = copyExercice(exerciseOrigin);
     Exercise exerciseDuplicate = exerciseRepository.save(exercise);
     actionMetricCollector.addSimulationCreatedCount();
+    duplicateGrants(exerciseDuplicate, exerciseOrigin);
     getListOfDuplicatedInjects(exerciseDuplicate, exerciseOrigin);
-    getListOfExerciseTeams(exerciseDuplicate, exerciseOrigin);
+    Map<String, Team> contextualTeams = getListOfExerciseTeams(exerciseDuplicate, exerciseOrigin);
+    duplicateTeamUsers(exerciseDuplicate, exerciseOrigin, contextualTeams);
     getListOfArticles(exerciseDuplicate, exerciseOrigin);
     getListOfVariables(exerciseDuplicate, exerciseOrigin);
     getObjectives(exerciseDuplicate, exerciseOrigin);
     getLessonsCategories(exerciseDuplicate, exerciseOrigin);
-    return exerciseRepository.save(exercise);
+    return exerciseRepository.save(exerciseDuplicate);
   }
 
   private Exercise copyExercice(Exercise exerciseOrigin) {
@@ -203,9 +215,7 @@ public class ExerciseService {
     exerciseDuplicate.setSubtitle(exerciseOrigin.getSubtitle());
     exerciseDuplicate.setLogoDark(exerciseOrigin.getLogoDark());
     exerciseDuplicate.setLogoLight(exerciseOrigin.getLogoLight());
-    exerciseDuplicate.setGrants(new ArrayList<>(exerciseOrigin.getGrants()));
     exerciseDuplicate.setTags(new HashSet<>(exerciseOrigin.getTags()));
-    exerciseDuplicate.setTeamUsers(new ArrayList<>(exerciseOrigin.getTeamUsers()));
     exerciseDuplicate.setReplyTos(new ArrayList<>(exerciseOrigin.getReplyTos()));
     exerciseDuplicate.setDocuments(new ArrayList<>(exerciseOrigin.getDocuments()));
     exerciseDuplicate.setLessonsAnonymized(exerciseOrigin.isLessonsAnonymized());
@@ -232,12 +242,12 @@ public class ExerciseService {
     }
 
     return exercise.getStart().isPresent() && exercise.getScenario() != null
-        ? cronService.getNextExecutionFromInstant(
-            exercise.getStart().get(), ZoneId.of("UTC"), exercise.getScenario().getRecurrence())
+        ? scenarioRecurrenceService.getNextExecutionTime(
+            exercise.getScenario(), exercise.getStart().get())
         : Optional.empty();
   }
 
-  private void getListOfExerciseTeams(
+  private Map<String, Team> getListOfExerciseTeams(
       @NotNull Exercise exercise, @NotNull Exercise exerciseOrigin) {
     Map<String, Team> contextualTeams = new HashMap<>();
     List<Team> exerciseTeams = new ArrayList<>();
@@ -273,6 +283,7 @@ public class ExerciseService {
                       });
               inject.setTeams(teams);
             });
+    return contextualTeams;
   }
 
   private void getListOfDuplicatedInjects(Exercise exercise, Exercise exerciseOrigin) {
@@ -401,6 +412,19 @@ public class ExerciseService {
     duplicatedExercise.setObjectives(duplicatedObjectives);
   }
 
+  private void duplicateGrants(@NotNull Exercise target, @NotNull Exercise source) {
+    List<Grant> duplicatedGrants =
+        grantService.duplicateGrants(source.getGrants(), target.getId(), SIMULATION);
+    target.setGrants(duplicatedGrants);
+  }
+
+  private void duplicateTeamUsers(
+      @NotNull Exercise target,
+      @NotNull Exercise source,
+      @NotNull Map<String, Team> contextualTeams) {
+    exerciseTeamUserService.duplicateTeamUsers(target, source.getTeamUsers(), contextualTeams);
+  }
+
   // -- EXERCISES --
   public List<ExerciseSimple> exercises() {
     // We get the exercises depending on whether or not we are granted or have the capa
@@ -437,6 +461,94 @@ public class ExerciseService {
     setComputedAttributesWithEmptyGlobalScore(result.exercises());
 
     return getExerciseSimples(specificationCount, pageable, result);
+  }
+
+  @Transactional(rollbackFor = Exception.class)
+  public Exercise changeExerciseStatus(ExerciseStatus status, String exerciseId) {
+    Exercise exercise =
+        this.exerciseRepository.findById(exerciseId).orElseThrow(ElementNotFoundException::new);
+    // Check if next status is possible
+    List<ExerciseStatus> nextPossibleStatus = exercise.nextPossibleStatus();
+    if (!nextPossibleStatus.contains(status)) {
+      throw new UnsupportedOperationException(
+          "Exercise can't support moving to status " + status.name());
+    }
+    boolean isCloseState =
+        ExerciseStatus.CANCELED.equals(exercise.getStatus())
+            || ExerciseStatus.FINISHED.equals(exercise.getStatus());
+
+    if (isCloseState && ExerciseStatus.SCHEDULED.equals(status)) {
+      resetExercise(exercise);
+    }
+    // In case of manual start
+    if (ExerciseStatus.SCHEDULED.equals(exercise.getStatus())
+        && ExerciseStatus.RUNNING.equals(status)) {
+      this.throwIfExerciseNotLaunchable(exercise);
+      Instant nextMinute = now().truncatedTo(MINUTES).plus(1, MINUTES);
+      exercise.setStart(nextMinute);
+      actionMetricCollector.addSimulationPlayedCount();
+    }
+    // If exercise move from pause to running state,
+    // we log the pause date to be able to recompute inject dates.
+    if (ExerciseStatus.PAUSED.equals(exercise.getStatus())
+        && ExerciseStatus.RUNNING.equals(status)) {
+      Instant lastPause = exercise.getCurrentPause().orElseThrow(ElementNotFoundException::new);
+      exercise.setCurrentPause(null);
+      pauseExerciseService.endPauseByExercise(lastPause, exercise);
+    }
+    // If pause is asked, just set the pause date.
+    if (ExerciseStatus.RUNNING.equals(exercise.getStatus())
+        && ExerciseStatus.PAUSED.equals(status)) {
+      exercise.setCurrentPause(Instant.now());
+    }
+    // Cancelation
+    if (ExerciseStatus.RUNNING.equals(exercise.getStatus())
+        && ExerciseStatus.CANCELED.equals(status)) {
+      exercise.setEnd(now());
+    }
+    exercise.setUpdatedAt(now());
+    exercise.setStatus(status);
+    return saveSimulation(exercise);
+  }
+
+  private void resetExercise(Exercise exercise) {
+    // 1. DELETE PAUSES
+    pauseExerciseService.deleteAllPauseByExerciseId(exercise.getId());
+
+    // 2. RESET INJECTS (status, communications, findings, expectations, collect status)
+    // Fetched separately from exercise.getInjects() for performance (avoids Eager loading overhead)
+    injectService.resetInjectByExerciseId(exercise.getId());
+
+    // 3. RESET LESSONS ANSWERS
+    lessonsService.resetLessonsAnswer(exercise.getId());
+
+    // 4. SCHEDULE MINIO CLEANUP (after commit to avoid cleanup on rollback)
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            try {
+              fileService.deleteDirectory(exercise.getId());
+            } catch (Exception e) {
+              log.error("Failed to delete directory for exercise {}", exercise.getId(), e);
+            }
+          }
+        });
+
+    // 5. RESET EXERCISE DATES
+    exercise.setStart(null);
+    exercise.setEnd(null);
+    exercise.setCurrentPause(null);
+  }
+
+  /**
+   * Save a simulation
+   *
+   * @param simulation simulation to save
+   * @return the saved simulation
+   */
+  public Exercise saveSimulation(Exercise simulation) {
+    return exerciseRepository.save(simulation);
   }
 
   public void throwIfExerciseNotLaunchable(Exercise exercise) {
@@ -728,8 +840,8 @@ public class ExerciseService {
       @NotBlank final String exerciseId, @NotNull final List<String> teamIds) {
     // Remove teams from exercise
     this.exerciseRepository.removeTeams(exerciseId, teamIds);
-    // Remove all association between users / exercises / teams
-    this.exerciseTeamUserRepository.deleteTeamsFromAllReferences(teamIds);
+    // Remove only associations for this exercise
+    this.exerciseTeamUserRepository.deleteByExerciseIdAndTeamIds(exerciseId, teamIds);
     // Remove all association between injects and teams
     this.injectRepository.removeTeamsForExercise(exerciseId, teamIds);
     // Remove all association between lessons learned and teams
@@ -737,17 +849,30 @@ public class ExerciseService {
     return teamService.find(fromIds(teamIds));
   }
 
+  @Transactional(rollbackFor = Exception.class)
   public List<TeamOutput> replaceTeams(
       @NotBlank final String exerciseId, @NotNull final List<String> teamIds) {
     Exercise exercise = this.exercise(exerciseId);
-    List<String> previousTeamIds = exercise.getTeams().stream().map(Team::getId).toList();
+    Set<String> previousTeamIds =
+        exercise.getTeams().stream().map(Team::getId).collect(Collectors.toSet());
+    Set<String> targetTeamIds = new LinkedHashSet<>(teamIds);
+
+    Set<String> removedTeamIds = new HashSet<>(previousTeamIds);
+    removedTeamIds.removeAll(targetTeamIds);
+    if (!removedTeamIds.isEmpty()) {
+      List<String> removedTeamIdsList = new ArrayList<>(removedTeamIds);
+      this.exerciseTeamUserRepository.deleteByExerciseIdAndTeamIds(exerciseId, removedTeamIdsList);
+      this.injectRepository.removeTeamsForExercise(exerciseId, removedTeamIdsList);
+      this.lessonsCategoryRepository.removeTeamsForExercise(exerciseId, removedTeamIdsList);
+    }
 
     // Replace teams from exercise
-    List<Team> teams = fromIterable(this.teamRepository.findAllById(teamIds));
+    List<Team> teams = fromIterable(this.teamRepository.findAllById(targetTeamIds));
     exercise.setTeams(teams);
+    this.exerciseRepository.save(exercise);
 
     List<String> teamIdsAdded =
-        teamIds.stream().filter(id -> !previousTeamIds.contains(id)).toList();
+        targetTeamIds.stream().filter(id -> !previousTeamIds.contains(id)).toList();
 
     List<Team> teamsAdded = fromIterable(this.teamRepository.findAllById(teamIdsAdded));
 
@@ -768,12 +893,18 @@ public class ExerciseService {
 
   public Exercise enablePlayers(
       @NotBlank final String exerciseId,
-      @NotBlank final Team team,
+      @NotNull final Team team,
       @NotNull final List<String> playerIds) {
     Exercise exercise =
         exerciseRepository.findById(exerciseId).orElseThrow(ElementNotFoundException::new);
     playerIds.forEach(
         playerId -> {
+          boolean alreadyLinked =
+              this.exerciseTeamUserRepository.existsByExerciseIdAndTeamIdAndUserId(
+                  exerciseId, team.getId(), playerId);
+          if (alreadyLinked) {
+            return;
+          }
           ExerciseTeamUser exerciseTeamUser = new ExerciseTeamUser();
           exerciseTeamUser.setExercise(exercise);
           exerciseTeamUser.setTeam(team);

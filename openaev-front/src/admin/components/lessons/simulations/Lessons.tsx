@@ -27,7 +27,7 @@ import Transition from '../../../../components/common/Transition';
 import { useFormatter } from '../../../../components/i18n';
 import { type Inject, type LessonsAnswer, type LessonsCategory, type LessonsQuestion, type LessonsSendInput, type LessonsTemplate, type Objective, type Team, type User } from '../../../../utils/api-types';
 import { useAppDispatch } from '../../../../utils/hooks';
-import { AbilityContext, Can } from '../../../../utils/permissions/PermissionsProvider';
+import { AbilityContext, Can } from '../../../../utils/permissions/permissionsContext';
 import { ACTIONS, SUBJECTS } from '../../../../utils/permissions/types';
 import { LessonContext, PermissionsContext } from '../../common/Context';
 import CreateLessonsTemplate from '../../components/lessons/CreateLessonsTemplate';
@@ -549,8 +549,7 @@ const Lessons: FunctionComponent<Props> = ({
           <SendLessonsForm
             onSubmit={handleSubmitSendLessons}
             initialValues={{
-              // eslint-disable-next-line no-template-curly-in-string
-              subject: t('[${exercise.name}] Lessons learned questionnaire'),
+              subject: t('[{exerciseName}] Lessons learned questionnaire', { exerciseName: source.name }),
               body: `${t('Hello')},<br /><br />${t(
                 // eslint-disable-next-line no-template-curly-in-string
                 'We would like thank your for your participation in this simulation. You are kindly requested to fill this lessons learned questionnaire: <a href="${lessons_uri}">${lessons_uri}</a>.',

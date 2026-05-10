@@ -1,8 +1,8 @@
 package io.openaev.scheduler;
 
+import static io.openaev.scheduler.jobs.user_event.UserEventRetentionJob.USER_EVENT_RETENTION_TRIGGER;
 import static org.quartz.CronScheduleBuilder.cronSchedule;
-import static org.quartz.SimpleScheduleBuilder.repeatMinutelyForever;
-import static org.quartz.SimpleScheduleBuilder.simpleSchedule;
+import static org.quartz.SimpleScheduleBuilder.*;
 import static org.quartz.TriggerBuilder.newTrigger;
 
 import org.quartz.SimpleScheduleBuilder;
@@ -62,6 +62,17 @@ public class PlatformTriggers {
 
   @Bean
   @Profile("!test")
+  public Trigger managerIntegrationsSyncTrigger() {
+    SimpleScheduleBuilder _15_seconds = simpleSchedule().withIntervalInSeconds(15).repeatForever();
+    return newTrigger()
+        .forJob(this.platformJobs.managerIntegrationsSync())
+        .withIdentity("managerIntegrationsSync")
+        .withSchedule(_15_seconds.withMisfireHandlingInstructionNextWithRemainingCount())
+        .build();
+  }
+
+  @Bean
+  @Profile("!test")
   public Trigger securityCoverageTrigger() {
     SimpleScheduleBuilder _15_seconds = simpleSchedule().withIntervalInSeconds(15).repeatForever();
     return newTrigger()
@@ -80,6 +91,29 @@ public class PlatformTriggers {
         .forJob(this.platformJobs.getConnectorPingJob())
         .withIdentity("connectorPingJob")
         .withSchedule(_40_seconds)
+        .build();
+  }
+
+  @Bean
+  public Trigger userEventRetentionTrigger() {
+    return newTrigger()
+        .forJob(this.platformJobs.userEventRetentionJobDetail())
+        .withIdentity(USER_EVENT_RETENTION_TRIGGER)
+        .withSchedule(cronSchedule("0 0 0 * * ?"))
+        .build();
+  }
+
+  /**
+   * Create a trigger to run the requeue system for the execution traces
+   *
+   * @return the trigger
+   */
+  @Bean
+  public Trigger executionTracesBatchRequeueTrigger() {
+    return newTrigger()
+        .forJob(this.platformJobs.getExecutionTracesBatchRequeueJob())
+        .withIdentity("ExecutionTracesBatchRequeueTrigger")
+        .withSchedule(repeatSecondlyForever(15))
         .build();
   }
 }

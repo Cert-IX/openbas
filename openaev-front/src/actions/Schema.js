@@ -1,7 +1,7 @@
 import { fromJS, List, Map } from 'immutable';
 import { schema } from 'normalizr';
 
-import locale from '../utils/BrowserLanguage.js';
+import locale from '../utils/BrowserLanguage';
 
 export const document = new schema.Entity(
   'documents',
@@ -283,7 +283,9 @@ export const storeHelper = state => ({
     t => t.get('token_user') === me(state)?.get('user_id'),
   ),
   getUserLang: () => {
-    const rawPlatformLang = state.referential.getIn(['entities', 'platformParameters', 'parameters', 'platform_lang']) ?? 'auto';
+    const publicParams = state.referential.getIn(['entities', 'publicPlatformParameters', 'parameters']);
+    const privateParams = state.referential.getIn(['entities', 'platformParameters', 'parameters']);
+    const rawPlatformLang = (privateParams ?? publicParams)?.get('platform_lang') ?? 'auto';
     const rawUserLang = me(state)?.get('user_lang') ?? 'auto';
     const platformLang = rawPlatformLang !== 'auto' ? rawPlatformLang : locale;
     const userLang = rawUserLang !== 'auto' ? rawUserLang : platformLang;
@@ -345,6 +347,7 @@ export const storeHelper = state => ({
   getTag: id => entity(id, 'tags', state),
   getTags: () => entities('tags', state),
   getTagsMap: () => maps('tags', state),
+
   // injects
   getInject: id => entity(id, 'injects', state),
   getAtomicTesting: id => entity(id, 'atomics', state),
@@ -359,6 +362,9 @@ export const storeHelper = state => ({
   getInjectExpectations: () => entities('injectexpectations', state),
   getExerciseInjectExpectations: id => entities('injectexpectations', state).filter(
     i => i.get('inject_expectation_exercise') === id,
+  ),
+  getInjectExpectationsByAssetAndInject: (asset_id, inject_id, type) => entities('injectexpectations', state).filter(
+    i => (i.get('inject_expectation_asset') === asset_id && i.get('inject_expectation_inject') === inject_id && i.get('inject_expectation_type') === type),
   ),
   getInjectExpectationsMap: () => maps('injectexpectations', state),
   // documents
@@ -379,10 +385,13 @@ export const storeHelper = state => ({
   getTeams: () => entities('teams', state),
   getTeamsMap: () => maps('teams', state),
   getPlatformSettings: () => {
-    return state.referential.getIn(['entities', 'platformParameters', 'parameters']) || Map({});
+    const publicParams = state.referential.getIn(['entities', 'publicPlatformParameters', 'parameters']) || Map({});
+    const privateParams = state.referential.getIn(['entities', 'platformParameters', 'parameters']) || Map({});
+    return publicParams.merge(privateParams);
   },
   getPlatformName: () => {
-    return state.referential.getIn(['entities', 'platformParameters', 'parameters', 'platform_name']) || 'OpenAEV - Open Adversarial Exposure Validation Platform';
+    const privateParams = state.referential.getIn(['entities', 'platformParameters', 'parameters']);
+    return privateParams?.get('platform_name') || 'OpenAEV - Open Adversarial Exposure Validation Platform';
   },
   // kill chain phases
   getKillChainPhase: id => entity(id, 'killchainphases', state),
@@ -398,7 +407,7 @@ export const storeHelper = state => ({
   getMitigationsMap: () => maps('mitigations', state),
   // injectors
   getInjector: id => entity(id, 'injectors', state),
-  getInjectors: () => entities('injectors', state),
+  getInjectorsIncludingPending: () => entities('injectors', state),
   getInjectorsMap: () => maps('injectors', state),
   // injector contracts
   getInjectorContract: (id) => {
@@ -411,11 +420,13 @@ export const storeHelper = state => ({
   getInjectorContracts: () => entities('injector_contracts', state),
   // collectors
   getCollector: id => entity(id, 'collectors', state),
-  getCollectors: () => entities('collectors', state),
+  getExistingCollectors: () => entities('collectors', state).filter(c => c.get('existing_collector') === true),
+  getCollectorsIncludingPending: () => entities('collectors', state),
   getCollectorsMap: () => maps('collectors', state),
   // executors
   getExecutor: id => entity(id, 'executors', state),
-  getExecutors: () => entities('executors', state),
+  getExistingExecutors: () => entities('executors', state).filter(c => c.get('existing_executor') === true),
+  getExecutorsIncludingPending: () => entities('executors', state),
   getExecutorsMap: () => maps('executors', state),
   // channels
   getChannels: () => entities('channels', state),
@@ -479,4 +490,11 @@ export const storeHelper = state => ({
     l => l.get('lessons_question_scenario') === id,
   ),
   getAgents: () => entities('agents', state),
+  // domains
+  getDomains: () => entities('domains', state),
+  // catalog
+  getCatalogConnectors: () => entities('catalog_connectors', state),
+  getUnDeployedCatalogConnectors: () => entities('catalog_connectors', state).filter(c => c.get('instance_deployed_count') === 0),
+  getCatalogConnector: id => entity(id, 'catalog_connectors', state),
+  getConnectorInstance: id => entity(id, 'connectorinstances', state),
 });

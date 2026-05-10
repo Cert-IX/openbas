@@ -13,7 +13,7 @@ import type {
   InjectResultOutput,
   InjectResultOverviewOutput,
 } from '../../../../utils/api-types';
-import { AbilityContext } from '../../../../utils/permissions/PermissionsProvider';
+import { AbilityContext } from '../../../../utils/permissions/permissionsContext';
 import { ACTIONS, SUBJECTS } from '../../../../utils/permissions/types';
 import { download } from '../../../../utils/utils';
 import AtomicTestingUpdate from './AtomicTestingUpdate';
@@ -82,7 +82,7 @@ const AtomicTestingPopover: FunctionComponent<Props> = ({
       const contentDisposition = result.headers['content-disposition'];
       const match = contentDisposition.match(/filename\s*=\s*(.*)/i);
       const filename = match[1];
-      download(result.data, filename, result.headers['content-type']);
+      download(result.data, filename, result.headers['content-type']?.toString());
     });
     handleCloseExport ();
   };

@@ -7,9 +7,12 @@ import static io.openaev.database.model.Payload.PAYLOAD_EXECUTION_ARCH.*;
 import static io.openaev.database.specification.InjectSpecification.*;
 import static io.openaev.helper.StreamHelper.fromIterable;
 import static io.openaev.helper.StreamHelper.iterableToSet;
+import static io.openaev.service.InjectExpectationUtils.extractAssetIdsFromInjectExpectationsResults;
 import static io.openaev.utils.AgentUtils.isPrimaryAgent;
 import static io.openaev.utils.FilterUtilsJpa.computeFilterGroupJpa;
+import static io.openaev.utils.InjectUtils.extractInjectExpectationsFromInjects;
 import static io.openaev.utils.StringUtils.duplicateString;
+import static io.openaev.utils.mapper.InjectStatusMapper.toExecutionTracesOutput;
 import static io.openaev.utils.pagination.SearchUtilsJpa.computeSearchJpa;
 import static java.time.Instant.now;
 
@@ -72,6 +75,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Triple;
 import org.hibernate.Hibernate;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
@@ -111,6 +116,13 @@ public class InjectService {
   private final HealthCheckUtils healthCheckUtils;
   private final InjectorContractContentUtils injectorContractContentUtils;
 
+  private InjectStatusService injectStatusService;
+
+  @Autowired
+  public void setInjectStatusService(@Lazy InjectStatusService injectStatusService) {
+    this.injectStatusService = injectStatusService;
+  }
+
   private final LicenseCacheManager licenseCacheManager;
   @Resource protected ObjectMapper mapper;
 
@@ -120,7 +132,24 @@ public class InjectService {
 
   // -- CRUD --
 
-  public Inject createInject(
+  public Inject createAndSaveInject(
+      @Nullable final Exercise exercise,
+      @Nullable final Scenario scenario,
+      @NotNull final InjectInput input) {
+    return injectRepository.save(buildInject(exercise, scenario, input));
+  }
+
+  public List<Inject> createAndSaveInjectList(
+      @Nullable final Exercise exercise,
+      @Nullable final Scenario scenario,
+      List<InjectInput> injectInputs) {
+
+    List<Inject> injects = new ArrayList<>();
+    injectInputs.forEach(injectInput -> injects.add(buildInject(exercise, scenario, injectInput)));
+    return injectRepository.saveAll(injects);
+  }
+
+  private Inject buildInject(
       @Nullable final Exercise exercise,
       @Nullable final Scenario scenario,
       @NotNull final InjectInput input) {
@@ -202,7 +231,7 @@ public class InjectService {
           injectorContractContentUtils.getDynamicInjectorContractFieldsForInject(injectorContract));
     }
 
-    return injectRepository.save(inject);
+    return inject;
   }
 
   public Inject inject(@NotBlank final String injectId) {
@@ -253,7 +282,7 @@ public class InjectService {
   @Transactional(rollbackOn = Exception.class)
   public void deleteAllByIds(List<String> injectIds) {
     if (!CollectionUtils.isEmpty(injectIds)) {
-      injectRepository.deleteAllById(injectIds);
+      injectRepository.deleteByAllIdsNative(injectIds);
     }
   }
 
@@ -411,7 +440,6 @@ public class InjectService {
 
   @Transactional
   public void delete(String id) {
-    injectDocumentRepository.deleteDocumentsFromInject(id);
     injectRepository.deleteById(id);
   }
 
@@ -812,6 +840,14 @@ public class InjectService {
     }
   }
 
+  public void resetInjectByExerciseId(String simulationId) {
+    List<Inject> injects = injectRepository.findAllInjectBySimulationId(simulationId);
+    if (injects.isEmpty()) return;
+    injects.forEach(Inject::clean);
+    injectStatusService.deleteAllInjectStatusByInjects(injects);
+    injectRepository.saveAll(injects);
+  }
+
   /**
    * Update the inject entities
    *
@@ -929,24 +965,21 @@ public class InjectService {
         .toList();
   }
 
-  public List<ExecutionTraceOutput> getInjectTracesFromInjectAndTarget(
+  public List<ExecutionTraceOutput> getInjectTracesOutputFromInjectAndTarget(
       final String injectId, final String targetId, final TargetType targetType) {
-    switch (targetType) {
-      case AGENT:
-        return injectStatusMapper.toExecutionTracesOutput(
-            this.executionTraceRepository.findByInjectIdAndAgentId(injectId, targetId));
-      case ASSETS:
-        return injectStatusMapper.toExecutionTracesOutput(
-            this.executionTraceRepository.findByInjectIdAndAssetId(injectId, targetId));
-      case TEAMS:
-        return injectStatusMapper.toExecutionTracesOutput(
-            this.executionTraceRepository.findByInjectIdAndTeamId(injectId, targetId));
-      case PLAYERS:
-        return injectStatusMapper.toExecutionTracesOutput(
-            this.executionTraceRepository.findByInjectIdAndPlayerId(injectId, targetId));
-      default:
-        throw new BadRequestException("Target type " + targetType + " is not supported");
-    }
+    return toExecutionTracesOutput(
+        getInjectTracesFromInjectAndTarget(injectId, targetId, targetType));
+  }
+
+  public List<ExecutionTrace> getInjectTracesFromInjectAndTarget(
+      final String injectId, final String targetId, final TargetType targetType) {
+    return switch (targetType) {
+      case AGENT -> this.executionTraceRepository.findByInjectIdAndAgentId(injectId, targetId);
+      case ASSETS -> this.executionTraceRepository.findByInjectIdAndAssetId(injectId, targetId);
+      case TEAMS -> this.executionTraceRepository.findByInjectIdAndTeamId(injectId, targetId);
+      case PLAYERS -> this.executionTraceRepository.findByInjectIdAndPlayerId(injectId, targetId);
+      default -> throw new BadRequestException("Target type " + targetType + " is not supported");
+    };
   }
 
   public InjectStatusOutput getInjectStatusWithGlobalExecutionTraces(String injectId) {
@@ -1166,6 +1199,10 @@ public class InjectService {
       extractCombinationAttackPatternPlatformArchitecture(Scenario scenario) {
 
     return scenario.getInjects().stream()
+        .filter(
+            inject ->
+                inject.getPayload().isEmpty()
+                    || !(inject.getPayload().get() instanceof DnsResolution))
         .map(inject -> inject.getInjectorContract().map(ic -> Map.entry(inject, ic)))
         .flatMap(Optional::stream)
         // Only keep attack patterns that specify both platform and architecture.
@@ -1292,5 +1329,19 @@ public class InjectService {
     healthChecks.addAll(healthCheckUtils.runAllInjectorChecks(inject, injectors));
 
     return healthChecks;
+  }
+
+  /**
+   * Extract all security platform from a list of injects
+   *
+   * @param injects to extract security platforms
+   * @return distinct security platforms
+   */
+  public List<SecurityPlatform> extractSecurityPlatforms(List<Inject> injects) {
+    Stream<InjectExpectation> allInjectExpectationsStream =
+        extractInjectExpectationsFromInjects(injects);
+    Set<String> assetIds =
+        extractAssetIdsFromInjectExpectationsResults(allInjectExpectationsStream);
+    return assetService.securityPlatformsByIds(assetIds);
   }
 }

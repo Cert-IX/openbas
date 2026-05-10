@@ -1,9 +1,10 @@
 package io.openaev.rest.exercise;
 
 import static io.openaev.rest.exercise.ExerciseApi.EXERCISE_URI;
-import static io.openaev.utils.JsonUtils.asJsonString;
+import static io.openaev.utils.JsonTestUtils.asJsonString;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -65,7 +66,8 @@ public class ExerciseTeamApiTest extends IntegrationTest {
                       + exerciseCreated.getId()
                       + "/teams/search?contextualOnly=false")
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(asJsonString(searchPaginationInput)))
+                  .content(asJsonString(searchPaginationInput))
+                  .with(csrf()))
           .andExpect(status().is2xxSuccessful())
           .andExpect(jsonPath("$.content.size()").value(2))
           .andExpect(
@@ -109,7 +111,8 @@ public class ExerciseTeamApiTest extends IntegrationTest {
                       + exerciseCreated.getId()
                       + "/teams/search?contextualOnly=true")
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(asJsonString(searchPaginationInput)))
+                  .content(asJsonString(searchPaginationInput))
+                  .with(csrf()))
           .andExpect(status().is2xxSuccessful())
           .andExpect(jsonPath("$.content.size()").value(2))
           .andExpect(

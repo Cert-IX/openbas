@@ -4,9 +4,10 @@ import static io.openaev.config.SessionHelper.currentUser;
 import static io.openaev.database.model.ExerciseStatus.SCHEDULED;
 import static io.openaev.database.model.Filters.FilterOperator.contains;
 import static io.openaev.rest.exercise.ExerciseApi.EXERCISE_URI;
-import static io.openaev.utils.JsonUtils.asJsonString;
+import static io.openaev.utils.JsonTestUtils.asJsonString;
 import static java.lang.String.valueOf;
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -29,8 +30,10 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 @TestInstance(PER_CLASS)
+@Transactional
 public class ExerciseApiSearchTest extends IntegrationTest {
 
   @Autowired private MockMvc mvc;
@@ -42,7 +45,7 @@ public class ExerciseApiSearchTest extends IntegrationTest {
 
   private static final List<String> EXERCISE_IDS = new ArrayList<>();
 
-  @BeforeAll
+  @BeforeEach
   void beforeAll() {
     Exercise exercise1 = ExerciseFixture.createDefaultCrisisExercise();
     Exercise exercise1Saved = this.exerciseRepository.save(exercise1);
@@ -51,11 +54,6 @@ public class ExerciseApiSearchTest extends IntegrationTest {
     Exercise exercise2 = ExerciseFixture.createDefaultIncidentResponseExercise();
     Exercise exercise2Saved = this.exerciseRepository.save(exercise2);
     EXERCISE_IDS.add(exercise2Saved.getId());
-  }
-
-  @AfterAll
-  void afterAll() {
-    this.exerciseRepository.deleteAllById(EXERCISE_IDS);
   }
 
   @Nested
@@ -77,7 +75,8 @@ public class ExerciseApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(EXERCISE_URI + "/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.numberOfElements").value(1));
       }
@@ -91,7 +90,8 @@ public class ExerciseApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(EXERCISE_URI + "/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.numberOfElements").value(0));
       }
@@ -113,7 +113,8 @@ public class ExerciseApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(EXERCISE_URI + "/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.content.[0].exercise_name").value("Crisis exercise"))
             .andExpect(jsonPath("$.content.[1].exercise_name").value("Incident response exercise"));
@@ -136,7 +137,8 @@ public class ExerciseApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(EXERCISE_URI + "/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.content.[1].exercise_name").value("Incident response exercise"))
             .andExpect(jsonPath("$.content.[0].exercise_name").value("Crisis exercise"));
@@ -157,7 +159,8 @@ public class ExerciseApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(EXERCISE_URI + "/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.numberOfElements").value(1));
       }
@@ -173,7 +176,8 @@ public class ExerciseApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(EXERCISE_URI + "/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.numberOfElements").value(2));
       }
@@ -187,7 +191,8 @@ public class ExerciseApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(EXERCISE_URI + "/search-by-id")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(getExercisesInput)))
+                    .content(asJsonString(getExercisesInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$").isArray())
             .andExpect(jsonPath("$.length()").value(2));
@@ -203,7 +208,8 @@ public class ExerciseApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(EXERCISE_URI + "/search-by-id")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(getExercisesInput)))
+                    .content(asJsonString(getExercisesInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$").isArray())
             .andExpect(jsonPath("$.length()").value(2));
@@ -219,7 +225,8 @@ public class ExerciseApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(EXERCISE_URI + "/search-by-id")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(getExercisesInput)))
+                    .content(asJsonString(getExercisesInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$").isArray())
             .andExpect(jsonPath("$.length()").value(0));
@@ -248,8 +255,8 @@ public class ExerciseApiSearchTest extends IntegrationTest {
         grantPlanner.setGroup(group);
         grantPlanner.setName(Grant.GRANT_TYPE.PLANNER);
         grantRepository.saveAll(List.of(grantObserver, grantPlanner));
-        group.setGrants(List.of(grantObserver, grantPlanner));
-        group.setUsers(List.of(user));
+        group.setGrants(new ArrayList<>(List.of(grantObserver, grantPlanner)));
+        group.setUsers(new ArrayList<>(List.of(user)));
         groupRepository.save(group);
         EXERCISE_IDS.add(exerciseGranted.getId());
 
@@ -262,7 +269,8 @@ public class ExerciseApiSearchTest extends IntegrationTest {
         mvc.perform(
                 post(EXERCISE_URI + "/search-by-id")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(getExercisesInput)))
+                    .content(asJsonString(getExercisesInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$").isArray())
             .andExpect(jsonPath("$.length()").value(1));

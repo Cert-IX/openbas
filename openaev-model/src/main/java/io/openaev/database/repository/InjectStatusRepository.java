@@ -2,9 +2,11 @@ package io.openaev.database.repository;
 
 import io.openaev.database.model.InjectStatus;
 import jakarta.validation.constraints.NotNull;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
@@ -24,6 +26,8 @@ public interface InjectStatusRepository
 
   Optional<InjectStatus> findByInjectId(@NotNull String injectId);
 
+  List<InjectStatus> findAllByInjectIdIn(Collection<String> injectIds);
+
   @Query(
       value =
           "SELECT ins.*, t.*"
@@ -36,4 +40,8 @@ public interface InjectStatusRepository
               + " WHERE i.inject_id = :injectId",
       nativeQuery = true)
   Optional<InjectStatus> findInjectStatusWithGlobalExecutionTraces(String injectId);
+
+  @Modifying(clearAutomatically = true)
+  @Query("delete from InjectStatus i where i.id in :ids")
+  void deleteAllByIds(@Param("ids") List<String> ids);
 }

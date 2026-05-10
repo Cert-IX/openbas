@@ -6,6 +6,7 @@ import { searchEndpointByIdAsOption } from '../../../../actions/assets/endpoint-
 import { searchSecurityPlatformByIdAsOption } from '../../../../actions/assets/securityPlatform-actions';
 import { searchAttackPatternsByIdAsOption } from '../../../../actions/AttackPattern';
 import { searchCustomDashboardByIdAsOptions } from '../../../../actions/custom_dashboards/customdashboard-action';
+import { searchDomainsByIdsAsOption } from '../../../../actions/domains/domain-actions';
 import { searchExerciseByIdAsOption } from '../../../../actions/exercises/exercise-action';
 import { searchInjectorByIdAsOptions } from '../../../../actions/injectors/injector-action';
 import { searchInjectByIdAsOption, searchTargetOptionsById } from '../../../../actions/injects/inject-action';
@@ -15,8 +16,9 @@ import { searchScenarioByIdAsOption } from '../../../../actions/scenarios/scenar
 import { searchSimulationByIdAsOptions } from '../../../../actions/simulations/simulation-action';
 import { searchTagByIdAsOption } from '../../../../actions/tags/tag-action';
 import { searchTeamByIdAsOption } from '../../../../actions/teams/team-actions';
+import ContractOutputElementType from '../../../../admin/components/findings/ContractOutputElementType';
 import { type GroupOption, type Option } from '../../../../utils/Option';
-import { AbilityContext } from '../../../../utils/permissions/PermissionsProvider';
+import { AbilityContext } from '../../../../utils/permissions/permissionsContext';
 import { ACTIONS, SUBJECTS } from '../../../../utils/permissions/types';
 import { CUSTOM_DASHBOARD, SCENARIOS, SIMULATIONS } from './constants';
 
@@ -69,6 +71,13 @@ const useRetrieveOptions = () => {
       case 'base_attack_patterns_side':
       case 'inject_attack_patterns':
         searchAttackPatternsByIdAsOption(ids).then((response) => {
+          setOptions(response.data);
+        });
+        break;
+      case 'payload_domains':
+      case 'injector_contract_domains':
+      case 'inject_contract_domains':
+        searchDomainsByIdsAsOption(ids).then((response) => {
           setOptions(response.data);
         });
         break;
@@ -145,6 +154,12 @@ const useRetrieveOptions = () => {
         searchInjectByIdAsOption(ids).then((response) => {
           setOptions(response.data);
         });
+        break;
+      case 'finding_type':
+        setOptions(ids.map(id => ({
+          id,
+          label: ContractOutputElementType[id as keyof typeof ContractOutputElementType] ?? id,
+        })));
         break;
       case 'finding_simulation':
         searchExerciseByIdAsOption(ids).then((response) => {

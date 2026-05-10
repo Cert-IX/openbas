@@ -9,7 +9,7 @@ import SwitchFieldController from '../../../../../components/fields/SwitchFieldC
 import { useFormatter } from '../../../../../components/i18n';
 import type { Article, Variable } from '../../../../../utils/api-types';
 import { type ContractElement, type EnhancedContractElement } from '../../../../../utils/api-types-custom';
-import { AbilityContext, Can } from '../../../../../utils/permissions/PermissionsProvider';
+import { AbilityContext, Can } from '../../../../../utils/permissions/permissionsContext';
 import { ACTIONS, SUBJECTS } from '../../../../../utils/permissions/types';
 import AssetGroupPopover from '../../../assets/asset_groups/AssetGroupPopover';
 import AssetGroupsList from '../../../assets/asset_groups/AssetGroupsList';
@@ -54,8 +54,13 @@ const InjectContentForm = ({
   const ability = useContext(AbilityContext);
 
   const renderTitle = (title: string, required: boolean = false, err: boolean = false) => {
+    const getTitleColor = () => {
+      if (err) return 'error';
+      if (readOnly) return 'text.disabled';
+      return 'textPrimary';
+    };
     return (
-      <Typography variant="h5" color={err ? 'error' : 'textPrimary'}>
+      <Typography variant="h5" color={getTitleColor()}>
         {title}
         {required ? '*' : '' }
       </Typography>
@@ -142,18 +147,15 @@ const InjectContentForm = ({
     control,
     name: 'inject_content.expectations',
   }) as ExpectationInput[];
-  const predefinedExpectations: ExpectationInput[] = enhancedFields
-    .filter(n => n.type === 'expectation')
-    .flatMap(f => f.predefinedExpectations ?? []);
   const onExpectationChange = (expectationIds: ExpectationInput[]) => setValue('inject_content.expectations', expectationIds, { shouldValidate: true });
 
   const renderExpectations = () => (
     <InjectExpectations
-      predefinedExpectationDatas={predefinedExpectations}
       expectationDatas={injectExpectations}
       handleExpectations={onExpectationChange}
       readOnly={enhancedFieldsMapByType.get('expectation')?.readOnly || readOnly}
       injectId={injectId}
+      injectorContractId={getValues('inject_injector_contract.injector_contract_id')}
     />
   );
 

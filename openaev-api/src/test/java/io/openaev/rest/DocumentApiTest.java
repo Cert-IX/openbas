@@ -5,6 +5,7 @@ import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 import static net.javacrumbs.jsonunit.core.Option.IGNORING_ARRAY_ORDER;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -13,17 +14,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.openaev.IntegrationTest;
 import io.openaev.database.model.Challenge;
 import io.openaev.database.model.Document;
+import io.openaev.database.model.Domain;
 import io.openaev.database.repository.ChallengeRepository;
 import io.openaev.database.repository.DocumentRepository;
 import io.openaev.rest.document.DocumentService;
 import io.openaev.rest.document.form.DocumentRelationsOutput;
 import io.openaev.rest.document.form.RelatedEntityOutput;
-import io.openaev.utils.fixtures.ChallengeFixture;
-import io.openaev.utils.fixtures.DocumentFixture;
-import io.openaev.utils.fixtures.FileFixture;
-import io.openaev.utils.fixtures.PayloadFixture;
+import io.openaev.utils.fixtures.*;
 import io.openaev.utils.fixtures.composers.ChallengeComposer;
 import io.openaev.utils.fixtures.composers.DocumentComposer;
+import io.openaev.utils.fixtures.composers.DomainComposer;
 import io.openaev.utils.fixtures.composers.PayloadComposer;
 import io.openaev.utils.fixtures.files.BinaryFile;
 import io.openaev.utils.mockUser.WithMockUser;
@@ -45,6 +45,7 @@ class DocumentApiTest extends IntegrationTest {
   @Autowired DocumentComposer documentComposer;
   @Autowired ChallengeComposer challengeComposer;
   @Autowired PayloadComposer payloadComposer;
+  @Autowired DomainComposer domainComposer;
   @Autowired private MockMvc mvc;
   @Autowired private DocumentRepository documentRepository;
   @Autowired private ChallengeRepository challengeRepository;
@@ -76,9 +77,10 @@ class DocumentApiTest extends IntegrationTest {
   }
 
   private Document getDocumentWithPayload() {
-
+    Set<Domain> domains =
+        domainComposer.forDomain(DomainFixture.getRandomDomain()).persist().getSet();
     PayloadComposer.Composer payload =
-        payloadComposer.forPayload(PayloadFixture.createDefaultExecutable());
+        payloadComposer.forPayload(PayloadFixture.createDefaultExecutable(domains));
 
     BinaryFile badCoffeeFileContent = FileFixture.getBadCoffeeFileContent();
     return documentComposer
@@ -99,7 +101,8 @@ class DocumentApiTest extends IntegrationTest {
     void givenADocumentRelatedToAPayload_ShouldNoDeleteDocument() throws Exception {
       Document document = getDocumentWithPayload();
 
-      mvc.perform(delete(DOCUMENT_API + "/" + document.getId())).andExpect(status().isBadRequest());
+      mvc.perform(delete(DOCUMENT_API + "/" + document.getId()).with(csrf()))
+          .andExpect(status().isBadRequest());
 
       Assertions.assertTrue(documentRepository.findById(document.getId()).isPresent());
     }
@@ -110,7 +113,8 @@ class DocumentApiTest extends IntegrationTest {
       Document document = getDocumentWithChallenge();
       Challenge challenge = document.getChallenges().stream().findFirst().get();
 
-      mvc.perform(delete(DOCUMENT_API + "/" + document.getId())).andExpect(status().isOk());
+      mvc.perform(delete(DOCUMENT_API + "/" + document.getId()).with(csrf()))
+          .andExpect(status().isOk());
 
       assertFalse(documentRepository.findById(document.getId()).isPresent());
       assertTrue(challengeRepository.findById(challenge.getId()).isPresent());
@@ -123,7 +127,7 @@ class DocumentApiTest extends IntegrationTest {
       Challenge challenge = document.getChallenges().stream().findFirst().get();
 
       String response =
-          mvc.perform(get(DOCUMENT_API + "/" + document.getId() + "/relations"))
+          mvc.perform(get(DOCUMENT_API + "/" + document.getId() + "/relations").with(csrf()))
               .andExpect(status().isOk())
               .andReturn()
               .getResponse()

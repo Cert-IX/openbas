@@ -1,7 +1,7 @@
 package io.openaev.rest;
 
 import static io.openaev.rest.asset.endpoint.EndpointApi.ENDPOINT_URI;
-import static io.openaev.utils.JsonUtils.asJsonString;
+import static io.openaev.utils.JsonTestUtils.asJsonString;
 import static io.openaev.utils.fixtures.AgentFixture.createAgent;
 import static io.openaev.utils.fixtures.AssetGroupFixture.createAssetGroupWithAssets;
 import static io.openaev.utils.fixtures.AssetGroupFixture.createDefaultAssetGroup;
@@ -11,6 +11,7 @@ import static io.openaev.utils.fixtures.TagFixture.getTag;
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -18,6 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import io.openaev.IntegrationTest;
 import io.openaev.database.model.*;
+import io.openaev.database.model.Tag;
 import io.openaev.database.repository.AssetGroupRepository;
 import io.openaev.database.repository.EndpointRepository;
 import io.openaev.database.repository.InjectRepository;
@@ -27,8 +29,10 @@ import io.openaev.rest.asset.endpoint.form.EndpointRegisterInput;
 import io.openaev.rest.exercise.service.ExerciseService;
 import io.openaev.service.EndpointService;
 import io.openaev.utils.fixtures.EndpointFixture;
+import io.openaev.utils.fixtures.ExecutorFixture;
 import io.openaev.utils.fixtures.ExerciseFixture;
 import io.openaev.utils.fixtures.PaginationFixture;
+import io.openaev.utils.fixtures.composers.ExecutorComposer;
 import io.openaev.utils.mapper.EndpointMapper;
 import io.openaev.utils.mockUser.WithMockUser;
 import io.openaev.utils.pagination.SearchPaginationInput;
@@ -36,10 +40,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 import org.json.JSONArray;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -59,9 +60,16 @@ class EndpointApiTest extends IntegrationTest {
   @Autowired private EndpointRepository endpointRepository;
   @Autowired private InjectRepository injectRepository;
   @Autowired private ExerciseService exerciseService;
+  @Autowired private ExecutorComposer executorComposer;
+  @Autowired private ExecutorFixture executorFixture;
 
   @SpyBean private EndpointService endpointService;
   @Autowired private AssetGroupRepository assetGroupRepository;
+
+  @BeforeEach
+  public void setup() {
+    executorComposer.forExecutor(executorFixture.getDefaultExecutor()).persist();
+  }
 
   @DisplayName("Given valid input, should create an endpoint agentless successfully")
   @Test
@@ -76,7 +84,8 @@ class EndpointApiTest extends IntegrationTest {
                 post(ENDPOINT_URI + "/agentless")
                     .content(asJsonString(endpointInput))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andReturn()
             .getResponse()
@@ -107,7 +116,8 @@ class EndpointApiTest extends IntegrationTest {
             post(ENDPOINT_URI + "/agentless")
                 .content(asJsonString(endpointInput))
                 .contentType(MediaType.APPLICATION_JSON)
-                .accept(MediaType.APPLICATION_JSON))
+                .accept(MediaType.APPLICATION_JSON)
+                .with(csrf()))
         .andExpect(status().is4xxClientError());
   }
 
@@ -146,7 +156,8 @@ class EndpointApiTest extends IntegrationTest {
                 post(ENDPOINT_URI + "/register")
                     .content(asJsonString(registerInput))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andReturn()
             .getResponse()
@@ -184,7 +195,8 @@ class EndpointApiTest extends IntegrationTest {
                 post(ENDPOINT_URI + "/register")
                     .content(asJsonString(registerInput))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andReturn()
             .getResponse()
@@ -229,7 +241,8 @@ class EndpointApiTest extends IntegrationTest {
                 put(ENDPOINT_URI + "/" + endpointCreated.getId())
                     .content(asJsonString(updateInput))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andReturn()
             .getResponse()
@@ -265,7 +278,9 @@ class EndpointApiTest extends IntegrationTest {
 
     // -- EXECUTE --
     mvc.perform(
-            delete(ENDPOINT_URI + "/" + endpointCreated.getId()).accept(MediaType.APPLICATION_JSON))
+            delete(ENDPOINT_URI + "/" + endpointCreated.getId())
+                .accept(MediaType.APPLICATION_JSON)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // The 2 calls (delete then get) should not be in the same transaction
@@ -275,7 +290,9 @@ class EndpointApiTest extends IntegrationTest {
 
     // -- ASSERT --
     mvc.perform(
-            get(ENDPOINT_URI + "/" + endpointCreated.getId()).accept(MediaType.APPLICATION_JSON))
+            get(ENDPOINT_URI + "/" + endpointCreated.getId())
+                .accept(MediaType.APPLICATION_JSON)
+                .with(csrf()))
         .andExpect(status().is4xxClientError());
   }
 
@@ -318,7 +335,8 @@ class EndpointApiTest extends IntegrationTest {
           mvc.perform(
                   post(ENDPOINT_URI + "/targets")
                       .contentType(MediaType.APPLICATION_JSON)
-                      .content(asJsonString(searchPaginationInput)))
+                      .content(asJsonString(searchPaginationInput))
+                      .with(csrf()))
               .andExpect(status().is2xxSuccessful())
               .andExpect(jsonPath("$.numberOfElements").value(2))
               .andReturn()
@@ -362,7 +380,8 @@ class EndpointApiTest extends IntegrationTest {
       mvc.perform(
               post(ENDPOINT_URI + "/targets")
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(asJsonString(searchPaginationInput)))
+                  .content(asJsonString(searchPaginationInput))
+                  .with(csrf()))
           .andExpect(status().is2xxSuccessful())
           .andExpect(jsonPath("$.numberOfElements").value(1))
           .andExpect(jsonPath("$.content.[0].asset_id").value(windowEndpoint.getId()));
@@ -400,7 +419,8 @@ class EndpointApiTest extends IntegrationTest {
       mvc.perform(
               post(ENDPOINT_URI + "/targets")
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(asJsonString(searchPaginationInput)))
+                  .content(asJsonString(searchPaginationInput))
+                  .with(csrf()))
           .andExpect(status().is2xxSuccessful())
           .andExpect(jsonPath("$.numberOfElements").value(1))
           .andExpect(jsonPath("$.content.[0].asset_id").value(windowEndpoint2.getId()));
@@ -480,7 +500,8 @@ class EndpointApiTest extends IntegrationTest {
                 get(ENDPOINT_URI + "/options")
                     .queryParam("searchText", searchText)
                     .queryParam("sourceId", simulationOrScenarioId ? exercise.getId() : null)
-                    .accept(MediaType.APPLICATION_JSON))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .with(csrf()))
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -520,7 +541,8 @@ class EndpointApiTest extends IntegrationTest {
                 post(ENDPOINT_URI + "/options")
                     .content(asJsonString(idsToSearch))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .accept(MediaType.APPLICATION_JSON))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .with(csrf()))
             .andReturn()
             .getResponse()
             .getContentAsString();

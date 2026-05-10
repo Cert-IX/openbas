@@ -1,7 +1,7 @@
 package io.openaev.service.stix;
 
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -201,6 +201,8 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
                           .sourceId(securityPlatformWrapper.get().getId())
                           .sourceName("Unit Tests")
                           .sourceType("manual")
+                          .sourcePlatform(SecurityPlatform.SECURITY_PLATFORM_TYPE.EDR.name())
+                          .sourceAssetId(UUID.randomUUID().toString())
                           .build())));
     }
 
@@ -240,11 +242,15 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
       // some security platforms
       SecurityPlatformComposer.Composer securityPlatformWrapper =
           securityPlatformComposer
-              .forSecurityPlatform(SecurityPlatformFixture.createDefaultEDR())
+              .forSecurityPlatform(
+                  SecurityPlatformFixture.createDefault(
+                      "Bad EDR", SecurityPlatform.SECURITY_PLATFORM_TYPE.EDR.name()))
               .persist();
       // another nameless platform not involved in simulation
       securityPlatformComposer
-          .forSecurityPlatform(SecurityPlatformFixture.createDefaultEDR())
+          .forSecurityPlatform(
+              SecurityPlatformFixture.createDefault(
+                  "New SIEM", SecurityPlatform.SECURITY_PLATFORM_TYPE.SIEM.name()))
           .persist();
       // create exercise cover all TTPs
       ExerciseComposer.Composer exerciseWrapper =
@@ -270,10 +276,8 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
       SecurityCoverage coverage = securityCoverageComposer.generatedItems.getFirst();
       DomainObject expectedAssessmentWithCoverage =
           getExpectedMainSecurityCoverage(coverage, injectComposer.generatedItems);
-      List<DomainObject> expectedPlatformIdentities =
-          securityPlatformComposer.generatedItems.stream()
-              .map(SecurityPlatform::toStixDomainObject)
-              .toList();
+
+      List<DomainObject> expectedPlatformIdentities = getExpectedPlatformIdentities();
 
       // main assessment is completed with coverage
       assertMainAssessment(bundle, generatedCoverage, expectedAssessmentWithCoverage);
@@ -481,6 +485,70 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
           assertThat(actualSros.size()).isEqualTo(0);
         }
       }
+
+      @Test
+      @DisplayName("Multiple bundles are created should have the same SRO ID")
+      public void whenMultipleBundlesAreCreatedShouldHaveTheSameSROID()
+          throws ParsingException, JsonProcessingException {
+        AttackPatternComposer.Composer ap1 =
+            attackPatternComposer.forAttackPattern(
+                AttackPatternFixture.createAttackPatternsWithExternalId("T1234"));
+        AttackPatternComposer.Composer ap2 =
+            attackPatternComposer.forAttackPattern(
+                AttackPatternFixture.createAttackPatternsWithExternalId("T5678"));
+        // some security platforms
+        SecurityPlatformComposer.Composer securityPlatformWrapper =
+            securityPlatformComposer
+                .forSecurityPlatform(
+                    SecurityPlatformFixture.createDefault(
+                        "Bad EDR", SecurityPlatform.SECURITY_PLATFORM_TYPE.EDR.name()))
+                .persist();
+        // another nameless platform not involved in simulation
+        securityPlatformComposer
+            .forSecurityPlatform(
+                SecurityPlatformFixture.createDefault(
+                    "New SIEM", SecurityPlatform.SECURITY_PLATFORM_TYPE.SIEM.name()))
+            .persist();
+        // create exercise cover all TTPs
+        ExerciseComposer.Composer exerciseWrapper =
+            createExerciseWrapperWithInjectsForDomainObjects(
+                Map.of(ap1, true, ap2, true), Map.of());
+        exerciseWrapper.get().setStatus(ExerciseStatus.FINISHED);
+
+        // set SUCCESS results for all inject expectations
+        setupSuccessfulExpectations(securityPlatformWrapper);
+        persistScenario(exerciseWrapper);
+
+        Optional<SecurityCoverageSendJob> job =
+            securityCoverageSendJobService.createOrUpdateCoverageSendJobForSimulationIfReady(
+                exerciseWrapper.get());
+
+        // intermediate assert
+        assertThat(job).isNotEmpty();
+
+        // act
+        Bundle bundle1 =
+            securityCoverageService.createBundleFromSendJobs(List.of(job.orElseThrow()));
+        Bundle bundle2 =
+            securityCoverageService.createBundleFromSendJobs(List.of(job.orElseThrow()));
+
+        // assert
+        assertThat(bundle1).isNotNull();
+        assertThat(bundle2).isNotNull();
+
+        List<String> sroIds1 =
+            bundle1.getRelationshipObjects().stream()
+                .filter(sro -> sro.hasProperty("id"))
+                .map(sro -> sro.getProperty("id").getValue().toString())
+                .toList();
+        List<String> sroIds2 =
+            bundle2.getRelationshipObjects().stream()
+                .filter(sro -> sro.hasProperty("id"))
+                .map(sro -> sro.getProperty("id").getValue().toString())
+                .toList();
+
+        assertThat(sroIds1).containsExactlyInAnyOrderElementsOf(sroIds2);
+      }
     }
   }
 
@@ -497,11 +565,15 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
             AttackPatternFixture.createAttackPatternsWithExternalId("T5678"));
     SecurityPlatformComposer.Composer securityPlatformWrapper =
         securityPlatformComposer
-            .forSecurityPlatform(SecurityPlatformFixture.createDefaultEDR())
+            .forSecurityPlatform(
+                SecurityPlatformFixture.createDefault(
+                    "Bad EDR", SecurityPlatform.SECURITY_PLATFORM_TYPE.EDR.name()))
             .persist();
     // another nameless platform not involved in simulation
     securityPlatformComposer
-        .forSecurityPlatform(SecurityPlatformFixture.createDefaultEDR())
+        .forSecurityPlatform(
+            SecurityPlatformFixture.createDefault(
+                "New SIEM", SecurityPlatform.SECURITY_PLATFORM_TYPE.SIEM.name()))
         .persist();
     // create exercise cover all TTPs
     ExerciseComposer.Composer exerciseWrapper =
@@ -528,6 +600,8 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
                             .sourceId(securityPlatformWrapper.get().getId())
                             .sourceName("Unit Tests")
                             .sourceType("manual")
+                            .sourcePlatform(SecurityPlatform.SECURITY_PLATFORM_TYPE.EDR.name())
+                            .sourceAssetId(UUID.randomUUID().toString())
                             .build())));
 
     Inject failedInject =
@@ -549,6 +623,8 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
                           .sourceId(securityPlatformWrapper.get().getId())
                           .sourceName("Unit Tests")
                           .sourceType("manual")
+                          .sourcePlatform(SecurityPlatform.SECURITY_PLATFORM_TYPE.EDR.name())
+                          .sourceAssetId(UUID.randomUUID().toString())
                           .build()));
               exp.setScore(0.0);
             });
@@ -557,8 +633,10 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
         .forScenario(ScenarioFixture.createDefaultCrisisScenario())
         .withSimulation(exerciseWrapper)
         .persist();
+
     entityManager.flush();
     entityManager.refresh(exerciseWrapper.get());
+
     Optional<SecurityCoverageSendJob> job =
         securityCoverageSendJobService.createOrUpdateCoverageSendJobForSimulationIfReady(
             exerciseWrapper.get());
@@ -572,12 +650,9 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
     // assert
     SecurityCoverage generatedCoverage = securityCoverageComposer.generatedItems.getFirst();
     List<Inject> generatedInjects = injectComposer.generatedItems;
-    List<SecurityPlatform> generatedSecurityPlatforms = securityPlatformComposer.generatedItems;
 
     DomainObject expectedAssessmentWithCoverage =
         getExpectedMainSecurityCoverage(generatedCoverage, generatedInjects);
-    List<DomainObject> expectedPlatformIdentities =
-        generatedSecurityPlatforms.stream().map(SecurityPlatform::toStixDomainObject).toList();
 
     // main assessment is completed with coverage
     assertThatJson(
@@ -587,6 +662,8 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
             CommonProperties.EXTERNAL_URI.toString(),
             CommonProperties.AUTO_ENRICHMENT_DISABLE.toString())
         .isEqualTo(expectedAssessmentWithCoverage.toStix(mapper));
+
+    List<DomainObject> expectedPlatformIdentities = getExpectedPlatformIdentities();
 
     // security platforms are present in bundle as Identities
     for (DomainObject platformSdo : expectedPlatformIdentities) {
@@ -690,7 +767,9 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
             AttackPatternFixture.createAttackPatternsWithExternalId("T1234"));
     SecurityPlatformComposer.Composer securityPlatformWrapper =
         securityPlatformComposer
-            .forSecurityPlatform(SecurityPlatformFixture.createDefaultEDR())
+            .forSecurityPlatform(
+                SecurityPlatformFixture.createDefault(
+                    "Bad EDR", SecurityPlatform.SECURITY_PLATFORM_TYPE.EDR.name()))
             .persist();
     // create exercise cover all TTPs
     ExerciseComposer.Composer exerciseWrapper =
@@ -717,6 +796,8 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
                             .sourceId(securityPlatformWrapper.get().getId())
                             .sourceName("Unit Tests")
                             .sourceType("manual")
+                            .sourcePlatform(SecurityPlatform.SECURITY_PLATFORM_TYPE.EDR.name())
+                            .sourceAssetId(UUID.randomUUID().toString())
                             .build())));
     // start the exercise
     Instant sroStartTime = Instant.parse("2003-02-15T09:45:02Z");
@@ -765,7 +846,9 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
             AttackPatternFixture.createAttackPatternsWithExternalId("T1234"));
     SecurityPlatformComposer.Composer securityPlatformWrapper =
         securityPlatformComposer
-            .forSecurityPlatform(SecurityPlatformFixture.createDefaultEDR())
+            .forSecurityPlatform(
+                SecurityPlatformFixture.createDefault(
+                    "Bad EDR", SecurityPlatform.SECURITY_PLATFORM_TYPE.EDR.name()))
             .persist();
     // create exercise cover all TTPs
     ExerciseComposer.Composer exerciseWrapper =
@@ -791,6 +874,8 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
                             .sourceId(securityPlatformWrapper.get().getId())
                             .sourceName("Unit Tests")
                             .sourceType("manual")
+                            .sourcePlatform(SecurityPlatform.SECURITY_PLATFORM_TYPE.EDR.name())
+                            .sourceAssetId(UUID.randomUUID().toString())
                             .build())));
     // start the exercise
     Instant sroStartTime = Instant.parse("2003-02-15T19:45:02Z");
@@ -835,7 +920,9 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
             AttackPatternFixture.createAttackPatternsWithExternalId("T1234"));
     SecurityPlatformComposer.Composer securityPlatformWrapper =
         securityPlatformComposer
-            .forSecurityPlatform(SecurityPlatformFixture.createDefaultEDR())
+            .forSecurityPlatform(
+                SecurityPlatformFixture.createDefault(
+                    "Bad EDR", SecurityPlatform.SECURITY_PLATFORM_TYPE.EDR.name()))
             .persist();
     // create exercise cover all TTPs
     ExerciseComposer.Composer exerciseWrapper =
@@ -861,6 +948,8 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
                             .sourceId(securityPlatformWrapper.get().getId())
                             .sourceName("Unit Tests")
                             .sourceType("manual")
+                            .sourcePlatform(SecurityPlatform.SECURITY_PLATFORM_TYPE.EDR.name())
+                            .sourceAssetId(UUID.randomUUID().toString())
                             .build())));
     // start the exercise
     Instant sroStartTime = Instant.parse("2003-02-15T19:45:02Z");
@@ -888,5 +977,20 @@ public class SecurityCoverageServiceTest extends IntegrationTest {
           .isEqualTo(new Timestamp(sroStartTime));
       assertThat(sro.hasProperty(RelationshipObject.Properties.STOP_TIME.toString())).isFalse();
     }
+  }
+
+  private List<DomainObject> getExpectedPlatformIdentities() {
+    Set<String> involvedPlatformNames =
+        injectComposer.generatedItems.stream()
+            .flatMap(inject -> inject.getExpectations().stream())
+            .flatMap(exp -> exp.getResults().stream())
+            .map(InjectExpectationResult::getSourceName)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+
+    return securityPlatformComposer.generatedItems.stream()
+        .filter(sp -> involvedPlatformNames.contains(sp.getName()))
+        .map(SecurityPlatform::toStixDomainObject)
+        .toList();
   }
 }

@@ -1,12 +1,13 @@
 package io.openaev.rest;
 
 import static io.openaev.rest.exercise.ExerciseApi.EXERCISE_URI;
-import static io.openaev.utils.JsonUtils.asJsonString;
+import static io.openaev.utils.JsonTestUtils.asJsonString;
 import static io.openaev.utils.fixtures.ExerciseFixture.getExercise;
 import static io.openaev.utils.fixtures.ExerciseLessonsCategoryFixture.getLessonsCategory;
 import static io.openaev.utils.fixtures.TeamFixture.getTeam;
 import static io.openaev.utils.fixtures.UserFixture.getUser;
 import static org.mockito.Mockito.verify;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -19,10 +20,13 @@ import io.openaev.database.repository.ExerciseRepository;
 import io.openaev.database.repository.LessonsCategoryRepository;
 import io.openaev.database.repository.TeamRepository;
 import io.openaev.database.repository.UserRepository;
+import io.openaev.integration.Manager;
+import io.openaev.integration.impl.injectors.email.EmailInjectorIntegrationFactory;
 import io.openaev.rest.exercise.service.ExerciseService;
 import io.openaev.rest.lessons.form.LessonsSendInput;
 import io.openaev.service.MailingService;
 import io.openaev.utils.mockUser.WithMockUser;
+import io.openaev.utilstest.RabbitMQTestListener;
 import java.util.List;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,9 +34,13 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestExecutionListeners;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
+@TestExecutionListeners(
+    value = {RabbitMQTestListener.class},
+    mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
 @AutoConfigureMockMvc
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class ExerciseLessonsApiTest extends IntegrationTest {
@@ -49,9 +57,11 @@ public class ExerciseLessonsApiTest extends IntegrationTest {
   @SpyBean private MailingService mailingService;
   @Autowired private TeamRepository teamRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private EmailInjectorIntegrationFactory emailInjectorIntegrationFactory;
 
   @BeforeAll
-  void beforeAll() {
+  void beforeAll() throws Exception {
+    new Manager(List.of(emailInjectorIntegrationFactory)).monitorIntegrations();
     LESSONCATEGORY = getLessonCategory();
   }
 
@@ -88,7 +98,8 @@ public class ExerciseLessonsApiTest extends IntegrationTest {
             post(EXERCISE_URI + "/" + EXERCISE.getId() + "/lessons_send")
                 .content(asJsonString(lessonsSendInput))
                 .contentType(MediaType.APPLICATION_JSON)
-                .accept(MediaType.APPLICATION_JSON))
+                .accept(MediaType.APPLICATION_JSON)
+                .with(csrf()))
         .andExpect(status().is2xxSuccessful());
 
     // -- ASSERT --

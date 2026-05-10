@@ -1,12 +1,14 @@
 package io.openaev.rest.custom_dashboard;
 
+import static io.openaev.engine.api.WidgetType.AVERAGE;
 import static io.openaev.engine.api.WidgetType.VERTICAL_BAR_CHART;
 import static io.openaev.rest.custom_dashboard.CustomDashboardApi.CUSTOM_DASHBOARDS_URI;
-import static io.openaev.utils.JsonUtils.asJsonString;
+import static io.openaev.utils.JsonTestUtils.asJsonString;
 import static io.openaev.utils.fixtures.CustomDashboardFixture.createDefaultCustomDashboard;
 import static io.openaev.utils.fixtures.WidgetFixture.NAME;
 import static io.openaev.utils.fixtures.WidgetFixture.createDefaultWidget;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -73,7 +75,42 @@ class CustomDashboardWidgetApiTest extends IntegrationTest {
         .perform(
             post(CUSTOM_DASHBOARDS_URI + "/" + customDashboard.getId() + "/widgets")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(asJsonString(input)))
+                .content(asJsonString(input))
+                .with(csrf()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.widget_config.title").value(name));
+  }
+
+  @Test
+  @WithMockUser(isAdmin = true)
+  void
+      given_valid_average_widget_input_when_creating_widget_should_return_created_widget_and_can_be_deleted()
+          throws Exception {
+    // -- PREPARE --
+    WidgetComposer.Composer composer = createWidgetComposer();
+    CustomDashboard customDashboard = composer.get().getCustomDashboard();
+    WidgetInput input = new WidgetInput();
+    input.setType(AVERAGE);
+    String name = "My new average widget";
+    DateHistogramWidget widgetConfig = new DateHistogramWidget();
+    widgetConfig.setTitle(name);
+    widgetConfig.setDateAttribute("base_updated_at");
+    widgetConfig.setTimeRange(CustomDashboardTimeRange.CUSTOM);
+    widgetConfig.setSeries(new ArrayList<>());
+    widgetConfig.setInterval(HistogramInterval.day);
+    widgetConfig.setStart("2012-12-21T10:45:23Z");
+    widgetConfig.setEnd("2012-12-22T10:45:23Z");
+    input.setWidgetConfiguration(widgetConfig);
+    WidgetLayout widgetLayout = new WidgetLayout();
+    input.setWidgetLayout(widgetLayout);
+
+    // -- EXECUTE & ASSERT --
+    mockMvc
+        .perform(
+            post(CUSTOM_DASHBOARDS_URI + "/" + customDashboard.getId() + "/widgets")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(asJsonString(input))
+                .with(csrf()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.widget_config.title").value(name));
   }
@@ -87,7 +124,8 @@ class CustomDashboardWidgetApiTest extends IntegrationTest {
 
     // -- EXECUTE & ASSERT --
     mockMvc
-        .perform(get(CUSTOM_DASHBOARDS_URI + "/" + customDashboard.getId() + "/widgets"))
+        .perform(
+            get(CUSTOM_DASHBOARDS_URI + "/" + customDashboard.getId() + "/widgets").with(csrf()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.length()").value(1))
         .andExpect(jsonPath("$[0].widget_config.title").value(NAME));
@@ -103,12 +141,12 @@ class CustomDashboardWidgetApiTest extends IntegrationTest {
     // -- EXECUTE & ASSERT --
     mockMvc
         .perform(
-            get(
-                CUSTOM_DASHBOARDS_URI
+            get(CUSTOM_DASHBOARDS_URI
                     + "/"
                     + customDashboard.getId()
                     + "/widgets/"
-                    + composer.get().getId()))
+                    + composer.get().getId())
+                .with(csrf()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.widget_config.title").value(NAME));
   }
@@ -135,7 +173,8 @@ class CustomDashboardWidgetApiTest extends IntegrationTest {
                     + "/widgets/"
                     + widget.getId())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(asJsonString(widget)))
+                .content(asJsonString(widget))
+                .with(csrf()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.widget_config.title").value(NAME))
         .andExpect(jsonPath("$.widget_layout.widget_layout_x").value(10));
@@ -153,11 +192,12 @@ class CustomDashboardWidgetApiTest extends IntegrationTest {
     mockMvc
         .perform(
             delete(
-                CUSTOM_DASHBOARDS_URI
-                    + "/"
-                    + customDashboard.getId()
-                    + "/widgets/"
-                    + widget.getId()))
+                    CUSTOM_DASHBOARDS_URI
+                        + "/"
+                        + customDashboard.getId()
+                        + "/widgets/"
+                        + widget.getId())
+                .with(csrf()))
         .andExpect(status().isNoContent());
 
     assertThat(repository.existsById(widget.getId())).isFalse();

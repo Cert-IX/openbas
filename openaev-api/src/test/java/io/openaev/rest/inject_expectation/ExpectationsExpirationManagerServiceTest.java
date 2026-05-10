@@ -1,7 +1,7 @@
 package io.openaev.rest.inject_expectation;
 
-import static io.openaev.injectors.openaev.OpenAEVInjector.OPENAEV_INJECTOR_ID;
-import static io.openaev.injectors.openaev.OpenAEVInjector.OPENAEV_INJECTOR_NAME;
+import static io.openaev.integration.impl.injectors.openaev.OpenaevInjectorIntegration.OPENAEV_INJECTOR_ID;
+import static io.openaev.integration.impl.injectors.openaev.OpenaevInjectorIntegration.OPENAEV_INJECTOR_NAME;
 import static io.openaev.utils.fixtures.ExpectationFixture.*;
 import static java.util.Collections.emptyList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -18,6 +18,7 @@ import io.openaev.utils.fixtures.*;
 import io.openaev.utils.mockUser.WithMockUser;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -186,7 +187,9 @@ public class ExpectationsExpirationManagerServiceTest extends IntegrationTest {
                   .sourceId("collector-id")
                   .sourceName("collector-name")
                   .sourceType("collector-type")
+                  .sourcePlatform(SecurityPlatform.SECURITY_PLATFORM_TYPE.EDR.name())
                   .result("result")
+                  .sourceAssetId(UUID.randomUUID().toString())
                   .score(50.0)
                   .build()));
       ie.setScore(50.0);
@@ -274,7 +277,9 @@ public class ExpectationsExpirationManagerServiceTest extends IntegrationTest {
                         .sourceId("collector-id")
                         .sourceName("collector-name")
                         .sourceType("collector-type")
+                        .sourcePlatform(SecurityPlatform.SECURITY_PLATFORM_TYPE.EDR.name())
                         .result("result")
+                        .sourceAssetId(UUID.randomUUID().toString())
                         .score(100.0)
                         .build()));
             injectExpectation.setScore(100.0);

@@ -2,30 +2,50 @@ package io.openaev.injector_contract;
 
 import static io.openaev.database.model.Filters.FilterOperator.contains;
 import static io.openaev.database.model.Filters.FilterOperator.eq;
-import static io.openaev.utils.JsonUtils.asJsonString;
+import static io.openaev.utils.JsonTestUtils.asJsonString;
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.openaev.IntegrationTest;
+import io.openaev.integration.Manager;
+import io.openaev.integration.impl.injectors.challenge.ChallengeInjectorIntegrationFactory;
+import io.openaev.integration.impl.injectors.channel.ChannelInjectorIntegrationFactory;
+import io.openaev.integration.impl.injectors.email.EmailInjectorIntegrationFactory;
+import io.openaev.integration.impl.injectors.manual.ManualInjectorIntegrationFactory;
 import io.openaev.utils.fixtures.PaginationFixture;
 import io.openaev.utils.mockUser.WithMockUser;
 import io.openaev.utils.pagination.SearchPaginationInput;
 import io.openaev.utils.pagination.SortField;
 import java.util.List;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 
 @TestInstance(PER_CLASS)
+@Transactional
 class InjectorContratApiTest extends IntegrationTest {
 
   @Autowired private MockMvc mvc;
+  @Autowired private EmailInjectorIntegrationFactory emailInjectorIntegrationFactory;
+  @Autowired private ChallengeInjectorIntegrationFactory challengeInjectorIntegrationFactory;
+  @Autowired private ChannelInjectorIntegrationFactory channelInjectorIntegrationFactory;
+  @Autowired private ManualInjectorIntegrationFactory manualInjectorIntegrationFactory;
+
+  @BeforeEach
+  public void before() throws Exception {
+    new Manager(
+            List.of(
+                emailInjectorIntegrationFactory,
+                challengeInjectorIntegrationFactory,
+                channelInjectorIntegrationFactory,
+                manualInjectorIntegrationFactory))
+        .monitorIntegrations();
+  }
 
   @Nested
   @WithMockUser(isAdmin = true)
@@ -42,7 +62,8 @@ class InjectorContratApiTest extends IntegrationTest {
         mvc.perform(
                 post("/api/injector_contracts/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(PaginationFixture.getDefault().build())))
+                    .content(asJsonString(PaginationFixture.getDefault().build()))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.numberOfElements").value(5));
       }
@@ -56,7 +77,8 @@ class InjectorContratApiTest extends IntegrationTest {
         mvc.perform(
                 post("/api/injector_contracts/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().isBadRequest());
       }
     }
@@ -75,7 +97,8 @@ class InjectorContratApiTest extends IntegrationTest {
         mvc.perform(
                 post("/api/injector_contracts/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.numberOfElements").value(1));
       }
@@ -90,7 +113,8 @@ class InjectorContratApiTest extends IntegrationTest {
         mvc.perform(
                 post("/api/injector_contracts/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.numberOfElements").value(0));
       }
@@ -112,7 +136,8 @@ class InjectorContratApiTest extends IntegrationTest {
         mvc.perform(
                 post("/api/injector_contracts/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.numberOfElements").value(1));
       }
@@ -127,7 +152,8 @@ class InjectorContratApiTest extends IntegrationTest {
         mvc.perform(
                 post("/api/injector_contracts/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.numberOfElements").value(1));
       }
@@ -143,7 +169,8 @@ class InjectorContratApiTest extends IntegrationTest {
         mvc.perform(
                 post("/api/injector_contracts/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(jsonPath("$.numberOfElements").value(1));
       }
@@ -170,7 +197,8 @@ class InjectorContratApiTest extends IntegrationTest {
         mvc.perform(
                 post("/api/injector_contracts/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(
                 jsonPath("$.content.[0].injector_contract_labels.en")
@@ -197,7 +225,8 @@ class InjectorContratApiTest extends IntegrationTest {
         mvc.perform(
                 post("/api/injector_contracts/search")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().is2xxSuccessful())
             .andExpect(
                 jsonPath("$.content.[0].injector_contract_labels.en")

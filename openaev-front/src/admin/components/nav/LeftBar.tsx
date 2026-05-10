@@ -1,9 +1,9 @@
-import { DashboardOutlined, DescriptionOutlined, DevicesOtherOutlined, DnsOutlined, Groups3Outlined, GroupsOutlined, HubOutlined, InsertChartOutlined, MovieFilterOutlined, OnlinePredictionOutlined, PersonOutlined, RocketLaunchOutlined, RowingOutlined, SchoolOutlined, SettingsOutlined, SmartButtonOutlined, SubscriptionsOutlined, TerminalOutlined } from '@mui/icons-material';
+import { DashboardOutlined, DescriptionOutlined, DevicesOtherOutlined, DnsOutlined, Groups3Outlined, GroupsOutlined, HubOutlined, InsertChartOutlined, MovieFilterOutlined, OnlinePredictionOutlined, PersonOutlined, RocketLaunchOutlined, RowingOutlined, SchoolOutlined, SettingsOutlined, SmartButtonOutlined, SubscriptionsOutlined, TerminalOutlined, Widgets } from '@mui/icons-material';
 import { Binoculars, NewspaperVariantMultipleOutline, PostOutline, SecurityNetwork, SelectGroup, Target } from 'mdi-material-ui';
 import { useContext } from 'react';
 
 import LeftMenu from '../../../components/common/menu/leftmenu/LeftMenu';
-import { AbilityContext } from '../../../utils/permissions/PermissionsProvider';
+import { AbilityContext } from '../../../utils/permissions/permissionsContext';
 import { ACTIONS, SUBJECTS } from '../../../utils/permissions/types';
 import { GETTING_STARTED_URI } from '../getting_started/GettingStartedRoutes';
 
@@ -40,19 +40,19 @@ const LeftBar = () => {
           path: `/admin/scenarios`,
           icon: () => (<MovieFilterOutlined />),
           label: 'Scenarios',
-          userRight: true,
+          userRight: ability.can(ACTIONS.ACCESS, SUBJECTS.ASSESSMENT),
         },
         {
           path: `/admin/simulations`,
           icon: () => (<HubOutlined />),
           label: 'Simulations',
-          userRight: true,
+          userRight: ability.can(ACTIONS.ACCESS, SUBJECTS.ASSESSMENT),
         },
         {
           path: `/admin/atomic_testings`,
           icon: () => (<Target />),
           label: 'Atomic testings',
-          userRight: true,
+          userRight: ability.can(ACTIONS.ACCESS, SUBJECTS.ASSESSMENT),
         },
       ],
     },
@@ -91,19 +91,19 @@ const LeftBar = () => {
           icon: () => (<Groups3Outlined />),
           label: 'People',
           href: 'teams',
-          userRight: true,
+          userRight: ability.can(ACTIONS.ACCESS, SUBJECTS.TEAMS_AND_PLAYERS),
           subItems: [
             {
               link: '/admin/teams/players',
               label: 'Players',
               icon: () => (<PersonOutlined fontSize="small" />),
-              userRight: true,
+              userRight: ability.can(ACTIONS.ACCESS, SUBJECTS.TEAMS_AND_PLAYERS),
             },
             {
               link: '/admin/teams/teams',
               label: 'Teams',
               icon: () => (<GroupsOutlined fontSize="small" />),
-              userRight: true,
+              userRight: ability.can(ACTIONS.ACCESS, SUBJECTS.TEAMS_AND_PLAYERS),
             },
           ],
         },
@@ -152,7 +152,7 @@ const LeftBar = () => {
           path: `/admin/payloads`,
           icon: () => (<SubscriptionsOutlined />),
           label: 'Payloads',
-          userRight: true,
+          userRight: ability.can(ACTIONS.ACCESS, SUBJECTS.PAYLOADS),
         },
         {
           path: `/admin/integrations`,
@@ -161,6 +161,12 @@ const LeftBar = () => {
           href: 'integrations',
           userRight: ability.can(ACTIONS.ACCESS, SUBJECTS.PLATFORM_SETTINGS),
           subItems: [
+            {
+              link: '/admin/integrations/catalog',
+              label: 'Catalog',
+              icon: () => (<Widgets fontSize="small" />),
+              userRight: ability.can(ACTIONS.ACCESS, SUBJECTS.PLATFORM_SETTINGS),
+            },
             {
               link: '/admin/integrations/injectors',
               label: 'Injectors',

@@ -1,12 +1,13 @@
 package io.openaev.rest;
 
-import static io.openaev.utils.JsonUtils.asJsonString;
+import static io.openaev.utils.JsonTestUtils.asJsonString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,6 +26,7 @@ import io.openaev.rest.report.model.Report;
 import io.openaev.rest.report.service.ReportService;
 import io.openaev.utils.fixtures.PaginationFixture;
 import io.openaev.utils.mockUser.WithMockUser;
+import io.openaev.utilstest.RabbitMQTestListener;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.UUID;
@@ -34,11 +36,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestExecutionListeners;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 @SpringBootTest
+@TestExecutionListeners(
+    value = {RabbitMQTestListener.class},
+    mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
 @AutoConfigureMockMvc
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(PER_CLASS)
@@ -91,7 +97,8 @@ public class ReportApiTest extends IntegrationTest {
                   MockMvcRequestBuilders.post("/api/exercises/" + exercise.getId() + "/reports")
                       .content(asJsonString(reportInput))
                       .contentType(MediaType.APPLICATION_JSON)
-                      .accept(MediaType.APPLICATION_JSON))
+                      .accept(MediaType.APPLICATION_JSON)
+                      .with(csrf()))
               .andExpect(status().is2xxSuccessful())
               .andReturn()
               .getResponse()
@@ -114,7 +121,8 @@ public class ReportApiTest extends IntegrationTest {
       String response =
           mvc.perform(
                   MockMvcRequestBuilders.get("/api/exercises/fakeExercisesId123/reports")
-                      .contentType(MediaType.APPLICATION_JSON))
+                      .contentType(MediaType.APPLICATION_JSON)
+                      .with(csrf()))
               .andExpect(status().is2xxSuccessful())
               .andReturn()
               .getResponse()
@@ -142,7 +150,8 @@ public class ReportApiTest extends IntegrationTest {
                           "/api/exercises/" + exercise.getId() + "/reports/" + report.getId())
                       .content(asJsonString(reportInput))
                       .contentType(MediaType.APPLICATION_JSON)
-                      .accept(MediaType.APPLICATION_JSON))
+                      .accept(MediaType.APPLICATION_JSON)
+                      .with(csrf()))
               .andExpect(status().is2xxSuccessful())
               .andReturn()
               .getResponse()
@@ -186,7 +195,8 @@ public class ReportApiTest extends IntegrationTest {
                               + "/inject-comments")
                       .content(asJsonString(injectCommentInput))
                       .contentType(MediaType.APPLICATION_JSON)
-                      .accept(MediaType.APPLICATION_JSON))
+                      .accept(MediaType.APPLICATION_JSON)
+                      .with(csrf()))
               .andExpect(status().is2xxSuccessful())
               .andReturn()
               .getResponse()
@@ -211,7 +221,8 @@ public class ReportApiTest extends IntegrationTest {
               MockMvcRequestBuilders.delete(
                       "/api/exercises/" + exercise.getId() + "/reports/" + report.getId())
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(asJsonString(PaginationFixture.getDefault().textSearch("").build())))
+                  .content(asJsonString(PaginationFixture.getDefault().textSearch("").build()))
+                  .with(csrf()))
           .andExpect(status().is2xxSuccessful());
 
       // -- ASSERT --

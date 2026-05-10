@@ -1,26 +1,28 @@
 package io.openaev.rest.executor;
 
-import static io.openaev.service.EndpointService.JFROG_BASE;
 import static io.openaev.service.EndpointService.SERVICE;
-import static io.openaev.utils.AgentUtils.AVAILABLE_ARCHITECTURES;
-import static io.openaev.utils.AgentUtils.AVAILABLE_PLATFORMS;
+import static io.openaev.utils.SecurityUtils.validateJFrogUri;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.openaev.aop.RBAC;
-import io.openaev.database.model.Action;
-import io.openaev.database.model.Executor;
-import io.openaev.database.model.ResourceType;
-import io.openaev.database.model.Token;
+import io.openaev.database.model.*;
 import io.openaev.database.repository.ExecutorRepository;
 import io.openaev.database.repository.TokenRepository;
+import io.openaev.executors.ExecutorService;
+import io.openaev.rest.catalog_connector.dto.ConnectorIds;
 import io.openaev.rest.exception.ElementNotFoundException;
 import io.openaev.rest.executor.form.ExecutorCreateInput;
+import io.openaev.rest.executor.form.ExecutorOutput;
 import io.openaev.rest.executor.form.ExecutorUpdateInput;
 import io.openaev.rest.helper.RestBehavior;
 import io.openaev.service.EndpointService;
 import io.openaev.service.FileService;
+import io.openaev.utils.AgentUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.annotation.Resource;
@@ -29,11 +31,10 @@ import jakarta.validation.Valid;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
 import java.time.Instant;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.io.IOUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -42,48 +43,67 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
+@RequiredArgsConstructor
 public class ExecutorApi extends RestBehavior {
+
+  public static final String EXECUTOR_URI = "/api/executors";
 
   @Value("${info.app.version:unknown}")
   String version;
 
-  @Value("${executor.openaev.binaries.origin:local}")
-  private String executorOpenaevBinariesOrigin;
+  @Value("${executor.openaev-agent.binaries.origin:${executor.openaev.binaries.origin:local}}")
+  private String agentBinaryOrigin;
 
-  @Value("${executor.openaev.binaries.version:${info.app.version:unknown}}")
-  private String executorOpenaevBinariesVersion;
+  @Value(
+      "${executor.openaev-agent.binaries.version:${executor.openaev.binaries.version:${info.app.version:unknown}}}")
+  private String agentBinaryVersion;
 
-  private ExecutorRepository executorRepository;
-  private EndpointService endpointService;
-  private FileService fileService;
-  private TokenRepository tokenRepository;
+  private final ExecutorRepository executorRepository;
+  private final EndpointService endpointService;
+  private final FileService fileService;
+  private final TokenRepository tokenRepository;
+  private final ExecutorService executorService;
 
   @Resource protected ObjectMapper mapper;
 
-  @Autowired
-  public void setTokenRepository(TokenRepository tokenRepository) {
-    this.tokenRepository = tokenRepository;
-  }
-
-  @Autowired
-  public void setEndpointService(EndpointService endpointService) {
-    this.endpointService = endpointService;
-  }
-
-  @Autowired
-  public void setFileService(FileService fileService) {
-    this.fileService = fileService;
-  }
-
-  @Autowired
-  public void setExecutorRepository(ExecutorRepository executorRepository) {
-    this.executorRepository = executorRepository;
-  }
-
-  @GetMapping("/api/executors")
+  @GetMapping(EXECUTOR_URI)
   @RBAC(actionPerformed = Action.READ, resourceType = ResourceType.ASSET)
-  public Iterable<Executor> executors() {
-    return executorRepository.findAll();
+  @Operation(
+      summary = "Retrieve executors",
+      description = "Retrieve all executors and pending executors if includeNext is true")
+  @ApiResponse(
+      responseCode = "200",
+      content =
+          @Content(
+              mediaType = "application/json",
+              array = @ArraySchema(schema = @Schema(implementation = ExecutorOutput.class))))
+  public Iterable<ExecutorOutput> executors(
+      @Parameter(
+              name = "includeNext",
+              description = "Include executors pending deployment",
+              required = false)
+          @RequestParam(value = "include_next", required = false, defaultValue = "false")
+          boolean includeNext) {
+    return executorService.executorsOutput(includeNext);
+  }
+
+  @GetMapping(EXECUTOR_URI + "/{executorId}")
+  @RBAC(
+      resourceId = "#collectorId",
+      actionPerformed = Action.READ,
+      resourceType = ResourceType.ASSET)
+  public Executor getExecutor(@PathVariable String executorId) {
+    return executorService.executor(executorId);
+  }
+
+  @GetMapping(EXECUTOR_URI + "/{executorId}/related-ids")
+  @RBAC(
+      resourceId = "#executorId",
+      actionPerformed = Action.READ,
+      resourceType = ResourceType.ASSET)
+  @Operation(summary = "Retrieve executor related ids")
+  public ConnectorIds getExecutorRelatedIds(@PathVariable String executorId) {
+    return executorService.getExecutorRelationsId(executorId);
   }
 
   private Executor updateExecutor(Executor executor, String type, String name, String[] platforms) {
@@ -94,7 +114,7 @@ public class ExecutorApi extends RestBehavior {
     return executorRepository.save(executor);
   }
 
-  @PutMapping("/api/executors/{executorId}")
+  @PutMapping(EXECUTOR_URI + "/{executorId}")
   @RBAC(
       resourceId = "#executorId",
       actionPerformed = Action.WRITE,
@@ -108,7 +128,7 @@ public class ExecutorApi extends RestBehavior {
   }
 
   @PostMapping(
-      value = "/api/executors",
+      value = EXECUTOR_URI,
       produces = {MediaType.APPLICATION_JSON_VALUE},
       consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE})
   @RBAC(actionPerformed = Action.WRITE, resourceType = ResourceType.ASSET)
@@ -186,30 +206,24 @@ public class ExecutorApi extends RestBehavior {
           @PathVariable
           String architecture)
       throws IOException {
-    platform = Optional.ofNullable(platform).map(String::toLowerCase).orElse("");
-    architecture = Optional.ofNullable(architecture).map(String::toLowerCase).orElse("");
-
-    if (!AVAILABLE_PLATFORMS.contains(platform)) {
-      throw new IllegalArgumentException("Platform invalid : " + platform);
-    }
-    if (!AVAILABLE_ARCHITECTURES.contains(architecture)) {
-      throw new IllegalArgumentException("Architecture invalid : " + architecture);
-    }
+    String resolvedPlatform =
+        AgentUtils.normaliseSupportedAgentPlatform(platform).name().toLowerCase();
+    String resolvedArch = AgentUtils.normaliseSupportedAgentArch(architecture).name().toLowerCase();
 
     InputStream in = null;
-    String resourcePath = "/openaev-agent/" + platform + "/" + architecture + "/";
+    String resourcePath = "/openaev-agent/" + resolvedPlatform + "/" + resolvedArch + "/";
     String filename = "";
 
-    if (executorOpenaevBinariesOrigin.equals("local")) { // if we want the local binaries
-      filename = "openaev-agent-" + version + (platform.equals("windows") ? ".exe" : "");
+    if (agentBinaryOrigin.equals("local")) { // if we want the local binaries
+      filename = "openaev-agent-" + version + (resolvedPlatform.equals("windows") ? ".exe" : "");
       in = getClass().getResourceAsStream("/agents" + resourcePath + filename);
-    } else if (executorOpenaevBinariesOrigin.equals(
+    } else if (agentBinaryOrigin.equals(
         "repository")) { // if we want a specific version from artifactory
       filename =
           "openaev-agent-"
-              + executorOpenaevBinariesVersion
-              + (platform.equals("windows") ? ".exe" : "");
-      in = new BufferedInputStream(new URL(JFROG_BASE + resourcePath + filename).openStream());
+              + agentBinaryVersion
+              + (resolvedPlatform.equals("windows") ? ".exe" : "");
+      in = new BufferedInputStream(validateJFrogUri(resourcePath, filename).toURL().openStream());
     }
     if (in != null) {
       HttpHeaders headers = new HttpHeaders();
@@ -219,7 +233,8 @@ public class ExecutorApi extends RestBehavior {
           .contentType(MediaType.APPLICATION_OCTET_STREAM)
           .body(IOUtils.toByteArray(in));
     }
-    throw new UnsupportedOperationException("Agent " + platform + " executable not supported");
+    throw new UnsupportedOperationException(
+        "Agent " + resolvedPlatform + " executable not supported");
   }
 
   // Public API
@@ -259,39 +274,34 @@ public class ExecutorApi extends RestBehavior {
           @PathVariable
           String installationMode)
       throws IOException {
-    platform = Optional.ofNullable(platform).map(String::toLowerCase).orElse("");
-    architecture = Optional.ofNullable(architecture).map(String::toLowerCase).orElse("");
-
-    if (!AVAILABLE_PLATFORMS.contains(platform)) {
-      throw new IllegalArgumentException("Platform invalid : " + platform);
-    }
-    if (!AVAILABLE_ARCHITECTURES.contains(architecture)) {
-      throw new IllegalArgumentException("Architecture invalid : " + architecture);
-    }
+    String resolvedInstallationMode = AgentUtils.getSupportedInstallationMode(installationMode);
+    String resolvedPlatform =
+        AgentUtils.normaliseSupportedAgentPlatform(platform).name().toLowerCase();
+    String resolvedArch = AgentUtils.normaliseSupportedAgentArch(architecture).name().toLowerCase();
 
     byte[] file = null;
     String filename = null;
 
-    if (platform.equals("windows")) {
+    if (resolvedPlatform.equals("windows")) {
       InputStream in = null;
-      String resourcePath = "/openaev-agent/windows/" + architecture + "/";
+      String resourcePath = "/openaev-agent/windows/" + resolvedArch + "/";
 
       filename = "openaev-agent-installer-";
-      if (installationMode != null && !installationMode.equals(SERVICE)) {
+      if (!resolvedInstallationMode.equals(SERVICE)) {
         filename = filename.concat(installationMode).concat("-");
       }
 
-      if (executorOpenaevBinariesOrigin.equals("local")) { // if we want the local binaries
+      if (agentBinaryOrigin.equals("local")) { // if we want the local binaries
         filename = filename.concat(version).concat(".exe");
         in = getClass().getResourceAsStream("/agents" + resourcePath + filename);
-      } else if (executorOpenaevBinariesOrigin.equals(
+      } else if (agentBinaryOrigin.equals(
           "repository")) { // if we want a specific version from artifactory
-        filename = filename.concat(executorOpenaevBinariesVersion).concat(".exe");
-        in = new BufferedInputStream(new URL(JFROG_BASE + resourcePath + filename).openStream());
+        filename = filename.concat(agentBinaryVersion).concat(".exe");
+        in = new BufferedInputStream(validateJFrogUri(resourcePath, filename).toURL().openStream());
       }
       if (in == null) {
         throw new UnsupportedOperationException(
-            "Agent version " + executorOpenaevBinariesVersion + " not found");
+            "Agent version " + agentBinaryVersion + " not found");
       }
       file = IOUtils.toByteArray(in);
     }
@@ -304,7 +314,7 @@ public class ExecutorApi extends RestBehavior {
           .contentType(MediaType.APPLICATION_OCTET_STREAM)
           .body(file);
     }
-    throw new UnsupportedOperationException("Agent " + platform + " package not supported");
+    throw new UnsupportedOperationException("Agent " + resolvedPlatform + " package not supported");
   }
 
   // Public API
@@ -343,18 +353,20 @@ public class ExecutorApi extends RestBehavior {
           String installationDir,
       @Parameter(description = "Service name") @RequestParam(required = false) String serviceName)
       throws IOException {
-    platform = Optional.ofNullable(platform).map(String::toLowerCase).orElse("");
-
-    if (!AVAILABLE_PLATFORMS.contains(platform)) {
-      throw new IllegalArgumentException("Platform invalid : " + platform);
-    }
-    Optional<Token> resolvedToken = tokenRepository.findByValue(token);
-    if (resolvedToken.isEmpty()) {
-      throw new UnsupportedOperationException("Invalid token");
-    }
+    String resolvedPlatform =
+        AgentUtils.normaliseSupportedAgentPlatform(platform).name().toLowerCase();
+    String resolvedInstallationMode = AgentUtils.getSupportedInstallationMode(installationMode);
+    Token resolvedToken =
+        tokenRepository
+            .findByValue(token)
+            .orElseThrow(() -> new UnsupportedOperationException("Invalid token"));
     String installCommand =
         this.endpointService.generateInstallCommand(
-            platform, token, installationMode, installationDir, serviceName);
+            resolvedPlatform,
+            resolvedToken.getValue(),
+            resolvedInstallationMode,
+            installationDir,
+            serviceName);
     return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(installCommand);
   }
 }

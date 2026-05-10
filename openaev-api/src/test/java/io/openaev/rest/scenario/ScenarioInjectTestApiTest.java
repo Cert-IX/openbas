@@ -1,15 +1,15 @@
 package io.openaev.rest.scenario;
 
-import static io.openaev.injectors.email.EmailContract.EMAIL_DEFAULT;
 import static io.openaev.rest.exercise.ExerciseApi.EXERCISE_URI;
 import static io.openaev.rest.scenario.ScenarioApi.SCENARIO_URI;
-import static io.openaev.utils.JsonUtils.asJsonString;
+import static io.openaev.utils.JsonTestUtils.asJsonString;
 import static net.javacrumbs.jsonunit.assertj.JsonAssertions.assertThatJson;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.TestInstance.Lifecycle.PER_CLASS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -17,7 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.openaev.IntegrationTest;
 import io.openaev.database.model.*;
-import io.openaev.database.repository.InjectorContractRepository;
+import io.openaev.integration.impl.injectors.email.EmailInjectorIntegrationFactory;
 import io.openaev.rest.inject.form.InjectBulkProcessingInput;
 import io.openaev.utils.fixtures.*;
 import io.openaev.utils.fixtures.composers.*;
@@ -41,6 +41,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @Transactional
 public class ScenarioInjectTestApiTest extends IntegrationTest {
 
+  @Autowired private EmailInjectorIntegrationFactory emailInjectorIntegrationFactory;
   @Autowired private MockMvc mvc;
   @Autowired private ScenarioComposer scenarioComposer;
   @Autowired private ExerciseComposer simulationComposer;
@@ -50,7 +51,6 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
   @Autowired private InjectorFixture injectorFixture;
   @Autowired private InjectorContractFixture injectorContractFixture;
   @Autowired private VariableComposer variableComposer;
-  @Autowired private InjectorContractRepository injectorContractRepository;
   @Autowired private EntityManager entityManager;
   @Autowired private ObjectMapper mapper;
   @Autowired private JavaMailSender mailSender;
@@ -70,7 +70,7 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
     private InjectorContractComposer.Composer createEmailContract() {
       return injectorContractComposer
           .forInjectorContract(injectorContractFixture.getWellKnownSingleEmailContract())
-          .withInjector(injectorFixture.getWellKnownEmailInjector());
+          .withInjector(injectorFixture.getWellKnownEmailInjector(true));
     }
 
     @Test
@@ -112,9 +112,10 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
       Mockito.doCallRealMethod().when(mailSender).send((MimeMessage) any());
       mvc.perform(
               get(
-                  SCENARIO_URI + "/{scenarioId}/injects/{injectId}/test",
-                  scenarioWithEmailInjectWrapper.get().getId(),
-                  scenarioWithEmailInjectWrapper.get().getInjects().getFirst().getId()))
+                      SCENARIO_URI + "/{scenarioId}/injects/{injectId}/test",
+                      scenarioWithEmailInjectWrapper.get().getId(),
+                      scenarioWithEmailInjectWrapper.get().getInjects().getFirst().getId())
+                  .with(csrf()))
           .andExpect(status().isOk());
 
       verify(mailSender).send(argument.capture());
@@ -152,9 +153,10 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
       Mockito.doCallRealMethod().when(mailSender).send((MimeMessage) any());
       mvc.perform(
               get(
-                  SCENARIO_URI + "/{scenarioId}/injects/{injectId}/test",
-                  scenarioWithEmailInjectWrapper.get().getId(),
-                  scenarioWithEmailInjectWrapper.get().getInjects().getFirst().getId()))
+                      SCENARIO_URI + "/{scenarioId}/injects/{injectId}/test",
+                      scenarioWithEmailInjectWrapper.get().getId(),
+                      scenarioWithEmailInjectWrapper.get().getInjects().getFirst().getId())
+                  .with(csrf()))
           .andExpect(status().isOk());
 
       verify(mailSender).send(argument.capture());
@@ -199,9 +201,10 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
       Mockito.doCallRealMethod().when(mailSender).send((MimeMessage) any());
       mvc.perform(
               get(
-                  EXERCISE_URI + "/{simulationId}/injects/{injectId}/test",
-                  simulationWithEmailInjectWrapper.get().getId(),
-                  simulationWithEmailInjectWrapper.get().getInjects().getFirst().getId()))
+                      EXERCISE_URI + "/{simulationId}/injects/{injectId}/test",
+                      simulationWithEmailInjectWrapper.get().getId(),
+                      simulationWithEmailInjectWrapper.get().getInjects().getFirst().getId())
+                  .with(csrf()))
           .andExpect(status().isOk());
 
       verify(mailSender).send(argument.capture());
@@ -241,9 +244,10 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
       Mockito.doCallRealMethod().when(mailSender).send((MimeMessage) any());
       mvc.perform(
               get(
-                  EXERCISE_URI + "/{simulationId}/injects/{injectId}/test",
-                  simulationWithEmailInjectWrapper.get().getId(),
-                  simulationWithEmailInjectWrapper.get().getInjects().getFirst().getId()))
+                      EXERCISE_URI + "/{simulationId}/injects/{injectId}/test",
+                      simulationWithEmailInjectWrapper.get().getId(),
+                      simulationWithEmailInjectWrapper.get().getInjects().getFirst().getId())
+                  .with(csrf()))
           .andReturn();
       // .andExpect(status().isOk());
 
@@ -264,7 +268,7 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
     private InjectorContractComposer.Composer createEmailContract() {
       return injectorContractComposer
           .forInjectorContract(injectorContractFixture.getWellKnownGlobalEmailContract())
-          .withInjector(injectorFixture.getWellKnownEmailInjector());
+          .withInjector(injectorFixture.getWellKnownEmailInjector(true));
     }
 
     @Test
@@ -301,9 +305,10 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
       Mockito.doCallRealMethod().when(mailSender).send((MimeMessage) any());
       mvc.perform(
               get(
-                  SCENARIO_URI + "/{scenarioId}/injects/{injectId}/test",
-                  scenarioWithEmailInjectWrapper.get().getId(),
-                  scenarioWithEmailInjectWrapper.get().getInjects().getFirst().getId()))
+                      SCENARIO_URI + "/{scenarioId}/injects/{injectId}/test",
+                      scenarioWithEmailInjectWrapper.get().getId(),
+                      scenarioWithEmailInjectWrapper.get().getInjects().getFirst().getId())
+                  .with(csrf()))
           .andExpect(status().isOk());
 
       verify(mailSender).send(argument.capture());
@@ -342,9 +347,10 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
       Mockito.doCallRealMethod().when(mailSender).send((MimeMessage) any());
       mvc.perform(
               get(
-                  SCENARIO_URI + "/{scenarioId}/injects/{injectId}/test",
-                  scenarioWithEmailInjectWrapper.get().getId(),
-                  scenarioWithEmailInjectWrapper.get().getInjects().getFirst().getId()))
+                      SCENARIO_URI + "/{scenarioId}/injects/{injectId}/test",
+                      scenarioWithEmailInjectWrapper.get().getId(),
+                      scenarioWithEmailInjectWrapper.get().getInjects().getFirst().getId())
+                  .with(csrf()))
           .andExpect(status().isOk());
 
       verify(mailSender).send(argument.capture());
@@ -389,9 +395,10 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
       Mockito.doCallRealMethod().when(mailSender).send((MimeMessage) any());
       mvc.perform(
               get(
-                  EXERCISE_URI + "/{simulationId}/injects/{injectId}/test",
-                  simulationWithEmailInjectWrapper.get().getId(),
-                  simulationWithEmailInjectWrapper.get().getInjects().getFirst().getId()))
+                      EXERCISE_URI + "/{simulationId}/injects/{injectId}/test",
+                      simulationWithEmailInjectWrapper.get().getId(),
+                      simulationWithEmailInjectWrapper.get().getInjects().getFirst().getId())
+                  .with(csrf()))
           .andExpect(status().isOk());
 
       verify(mailSender).send(argument.capture());
@@ -432,9 +439,10 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
       Mockito.doCallRealMethod().when(mailSender).send((MimeMessage) any());
       mvc.perform(
               get(
-                  EXERCISE_URI + "/{simulationId}/injects/{injectId}/test",
-                  simulationWithEmailInjectWrapper.get().getId(),
-                  simulationWithEmailInjectWrapper.get().getInjects().getFirst().getId()))
+                      EXERCISE_URI + "/{simulationId}/injects/{injectId}/test",
+                      simulationWithEmailInjectWrapper.get().getId(),
+                      simulationWithEmailInjectWrapper.get().getInjects().getFirst().getId())
+                  .with(csrf()))
           .andExpect(status().isOk());
 
       verify(mailSender).send(argument.capture());
@@ -452,9 +460,8 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
   @DisplayName("other tests")
   public class OtherTests {
     @BeforeEach
-    void setupData() {
-      InjectorContract injectorContract =
-          injectorContractRepository.findById(EMAIL_DEFAULT).orElseThrow();
+    void setupData() throws Exception {
+      InjectorContract injectorContract = injectorContractFixture.getWellKnownSingleEmailContract();
 
       InjectTestStatusComposer.Composer injectTestStatusComposer1 =
           injectTestStatusComposer.forInjectTestStatus(
@@ -483,7 +490,8 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
       scenarioWrapper =
           scenarioComposer
               .forScenario(ScenarioFixture.getScenario())
-              .withInjects(List.of(injectComposer1, injectComposer2));
+              .withInjects(List.of(injectComposer1, injectComposer2))
+              .persist();
     }
 
     @Nested
@@ -501,7 +509,8 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
                             SCENARIO_URI + "/{scenarioId}/injects/test/search",
                             scenarioWrapper.persist().get().getId())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(asJsonString(searchPaginationInput)))
+                        .content(asJsonString(searchPaginationInput))
+                        .with(csrf()))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
@@ -518,9 +527,8 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
       @WithMockUser(withCapabilities = {Capability.ACCESS_ASSESSMENT})
       void should_return_test_status_by_testId() throws Exception {
         mvc.perform(
-                get(
-                    SCENARIO_URI + "/injects/test/{testId}",
-                    injectTestStatus1Wrapper.get().getId()))
+                get(SCENARIO_URI + "/injects/test/{testId}", injectTestStatus1Wrapper.get().getId())
+                    .with(csrf()))
             .andExpect(status().isOk());
       }
 
@@ -530,9 +538,10 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
       void should_return_test_status_when_testing_specific_inject() throws Exception {
         mvc.perform(
                 get(
-                    SCENARIO_URI + "/{scenarioId}/injects/{injectId}/test",
-                    scenarioWrapper.persist().get().getId(),
-                    inject1Wrapper.get().getId()))
+                        SCENARIO_URI + "/{scenarioId}/injects/{injectId}/test",
+                        scenarioWrapper.persist().get().getId(),
+                        inject1Wrapper.get().getId())
+                    .with(csrf()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.inject_id").value(inject1Wrapper.get().getId()));
       }
@@ -550,7 +559,8 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
         mvc.perform(
                 post(SCENARIO_URI + "/{scenarioId}/injects/test", testScenario.getId())
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(input)))
+                    .content(asJsonString(input))
+                    .with(csrf()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$").isArray());
       }
@@ -561,9 +571,10 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
       void should_return_200_when_fetching_deleting_an_inject_test_status() throws Exception {
         mvc.perform(
                 delete(
-                    SCENARIO_URI + "/{scenarioId}/injects/test/{testId}",
-                    scenarioWrapper.persist().get().getId(),
-                    injectTestStatus2Wrapper.get().getId()))
+                        SCENARIO_URI + "/{scenarioId}/injects/test/{testId}",
+                        scenarioWrapper.persist().get().getId(),
+                        injectTestStatus2Wrapper.get().getId())
+                    .with(csrf()))
             .andExpect(status().isOk());
       }
     }
@@ -582,7 +593,8 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
                         SCENARIO_URI + "/{scenarioId}/injects/test/search",
                         scenarioWrapper.persist().get().getId())
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(searchPaginationInput)))
+                    .content(asJsonString(searchPaginationInput))
+                    .with(csrf()))
             .andExpect(status().isForbidden());
       }
 
@@ -591,9 +603,8 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
       @WithMockUser(withCapabilities = {Capability.ACCESS_ASSESSMENT})
       void should_return_200_when_search_by_testId() throws Exception {
         mvc.perform(
-                get(
-                    SCENARIO_URI + "/injects/test/{testId}",
-                    injectTestStatus1Wrapper.get().getId()))
+                get(SCENARIO_URI + "/injects/test/{testId}", injectTestStatus1Wrapper.get().getId())
+                    .with(csrf()))
             .andExpect(status().isOk());
       }
 
@@ -602,9 +613,10 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
       void should_return_403_when_testing_specific_inject() throws Exception {
         mvc.perform(
                 get(
-                    SCENARIO_URI + "/{scenarioId}/injects/{injectId}/test",
-                    scenarioWrapper.persist().get().getId(),
-                    inject1Wrapper.get().getId()))
+                        SCENARIO_URI + "/{scenarioId}/injects/{injectId}/test",
+                        scenarioWrapper.persist().get().getId(),
+                        inject1Wrapper.get().getId())
+                    .with(csrf()))
             .andExpect(status().isForbidden());
       }
 
@@ -621,7 +633,8 @@ public class ScenarioInjectTestApiTest extends IntegrationTest {
                         SCENARIO_URI + "/{scenarioId}/injects/test",
                         scenarioWrapper.persist().get().getId())
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(asJsonString(input)))
+                    .content(asJsonString(input))
+                    .with(csrf()))
             .andExpect(status().isForbidden());
       }
     }
